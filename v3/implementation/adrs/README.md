@@ -77,10 +77,35 @@ All ADRs consider security:
 
 **Last Updated:** 2026-01-07
 **Project:** Claude-Flow V3
-**Version:** 3.0.3
+**Version:** 3.0.0-alpha.7
 
 ### Recent Updates (2026-01-07)
-- **ADR-014**: Added Node.js Worker Daemon extension - cross-platform TypeScript daemon replaces shell helpers
-- **CLI**: New `daemon` command with start/stop/status/trigger/enable subcommands
+
+#### Release: @claude-flow/cli@3.0.0-alpha.7
+- **Hive-Mind CLI**: All MCP tools now exposed via CLI subcommands:
+  - `hive-mind join <agent-id>` - Join agent to hive
+  - `hive-mind leave <agent-id>` - Remove agent from hive
+  - `hive-mind consensus` - Manage consensus proposals and voting
+  - `hive-mind broadcast -m <msg>` - Broadcast messages to workers
+  - `hive-mind memory` - Access shared memory (get/set/delete/list)
+- **Bug Fix**: Fixed positional argument parsing for subcommands in CLI parser
+- **File Persistence**: All MCP tools use file-based persistence in `.claude-flow/` directories
+- **ADR-014**: Node.js Worker Daemon - cross-platform TypeScript daemon replaces shell helpers
+- **CLI**: `daemon` command with start/stop/status/trigger/enable subcommands
 - **Session Integration**: Auto-start daemon on SessionStart, auto-stop on SessionEnd
-- **Package**: `claude-flow@v3alpha` now uses V3 CLI via root `bin` configuration
+
+#### CLI MCP Tool Coverage
+| Category | Tools | CLI Status |
+|----------|-------|------------|
+| Agent | spawn, terminate, status, list, pool, health, update | ✅ Complete |
+| Hive-Mind | init, spawn, status, task, join, leave, consensus, broadcast, memory, optimize-memory, shutdown | ✅ Complete |
+| Task | create, status, list, complete, cancel | ✅ Complete |
+| Session | save, restore, list, delete, export | ✅ Complete |
+| Config | get, set, list, reset, export, import | ✅ Complete |
+| Memory | store, retrieve, list, delete, search | ✅ Complete |
+| Workflow | create, execute, list, status, delete | ✅ Complete |
+
+#### Install
+```bash
+npx @claude-flow/cli@v3alpha --help
+```
