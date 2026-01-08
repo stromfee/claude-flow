@@ -656,8 +656,6 @@ interface AskUserQuestionInput {
 
 ---
 
----
-
 ## Updates (2026-01-08)
 
 ### One-Command Project Setup (`init --start-all`)
