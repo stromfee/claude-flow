@@ -807,6 +807,835 @@ v3/@claude-flow/cli/src/
 
 ---
 
+## MCP Tools Integration
+
+### Transfer MCP Tools
+
+```typescript
+// v3/@claude-flow/cli/src/mcp-tools/transfer-tools.ts
+
+import type { MCPTool } from './types.js';
+
+export const transferTools: MCPTool[] = [
+  // ═══════════════════════════════════════════════════════════════
+  // EXPORT TOOLS
+  // ═══════════════════════════════════════════════════════════════
+  {
+    name: 'transfer/export',
+    description: 'Export learning patterns to file or IPFS with anonymization',
+    category: 'transfer',
+    version: '1.0.0',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        output: {
+          type: 'string',
+          description: 'Output file path (optional if toIpfs is true)'
+        },
+        format: {
+          type: 'string',
+          enum: ['cbor', 'json', 'msgpack', 'cbor.gz', 'cbor.zstd'],
+          default: 'cbor',
+          description: 'Serialization format'
+        },
+        anonymize: {
+          type: 'string',
+          enum: ['minimal', 'standard', 'strict', 'paranoid'],
+          default: 'standard',
+          description: 'Anonymization level'
+        },
+        redactPii: {
+          type: 'boolean',
+          default: true,
+          description: 'Redact personally identifiable information'
+        },
+        stripPaths: {
+          type: 'boolean',
+          default: false,
+          description: 'Strip absolute file paths'
+        },
+        types: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Pattern types to export (routing, complexity, coverage, trajectory)'
+        },
+        minConfidence: {
+          type: 'number',
+          minimum: 0,
+          maximum: 1,
+          default: 0.5,
+          description: 'Minimum confidence threshold for patterns'
+        },
+        since: {
+          type: 'string',
+          description: 'Export patterns since date (ISO 8601)'
+        },
+        toIpfs: {
+          type: 'boolean',
+          default: false,
+          description: 'Upload to IPFS instead of file'
+        },
+        pin: {
+          type: 'boolean',
+          default: true,
+          description: 'Pin to IPFS pinning service (requires toIpfs)'
+        },
+        gateway: {
+          type: 'string',
+          default: 'https://w3s.link',
+          description: 'IPFS gateway URL'
+        }
+      }
+    },
+    handler: async (input) => {
+      const { exportPatterns } = await import('../transfer/export.js');
+      return exportPatterns(input);
+    }
+  },
+
+  // ═══════════════════════════════════════════════════════════════
+  // IMPORT TOOLS
+  // ═══════════════════════════════════════════════════════════════
+  {
+    name: 'transfer/import',
+    description: 'Import learning patterns from file or IPFS',
+    category: 'transfer',
+    version: '1.0.0',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        input: {
+          type: 'string',
+          description: 'Input file path (optional if fromIpfs is set)'
+        },
+        fromIpfs: {
+          type: 'string',
+          description: 'IPFS CID to import from'
+        },
+        fromStore: {
+          type: 'string',
+          description: 'Pattern store name to import from'
+        },
+        version: {
+          type: 'string',
+          default: 'latest',
+          description: 'Version to import (for store imports)'
+        },
+        strategy: {
+          type: 'string',
+          enum: ['replace', 'merge', 'append'],
+          default: 'merge',
+          description: 'Import strategy for existing patterns'
+        },
+        conflictResolution: {
+          type: 'string',
+          enum: ['highest-confidence', 'newest', 'oldest', 'keep-local', 'keep-remote'],
+          default: 'highest-confidence',
+          description: 'How to resolve pattern conflicts'
+        },
+        verifySignature: {
+          type: 'boolean',
+          default: false,
+          description: 'Require valid signature for import'
+        },
+        dryRun: {
+          type: 'boolean',
+          default: false,
+          description: 'Preview import without applying changes'
+        }
+      }
+    },
+    handler: async (input) => {
+      const { importPatterns } = await import('../transfer/import.js');
+      return importPatterns(input);
+    }
+  },
+
+  // ═══════════════════════════════════════════════════════════════
+  // ANONYMIZATION TOOLS
+  // ═══════════════════════════════════════════════════════════════
+  {
+    name: 'transfer/anonymize',
+    description: 'Anonymize patterns with configurable PII redaction',
+    category: 'transfer',
+    version: '1.0.0',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        input: {
+          type: 'string',
+          description: 'Input file path',
+          required: true
+        },
+        output: {
+          type: 'string',
+          description: 'Output file path',
+          required: true
+        },
+        level: {
+          type: 'string',
+          enum: ['minimal', 'standard', 'strict', 'paranoid'],
+          default: 'standard',
+          description: 'Anonymization level'
+        },
+        customDetectors: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              name: { type: 'string' },
+              pattern: { type: 'string' },
+              replacement: { type: 'string' },
+              severity: { type: 'string', enum: ['low', 'medium', 'high', 'critical'] }
+            }
+          },
+          description: 'Custom PII detection patterns'
+        },
+        preserveStructure: {
+          type: 'boolean',
+          default: true,
+          description: 'Preserve directory structure in paths'
+        },
+        kAnonymity: {
+          type: 'number',
+          minimum: 2,
+          default: 5,
+          description: 'K-anonymity level for differential privacy'
+        },
+        epsilon: {
+          type: 'number',
+          minimum: 0.01,
+          maximum: 10,
+          default: 0.1,
+          description: 'Epsilon for differential privacy noise'
+        }
+      },
+      required: ['input', 'output']
+    },
+    handler: async (input) => {
+      const { anonymizePatterns } = await import('../transfer/anonymization/index.js');
+      return anonymizePatterns(input);
+    }
+  },
+
+  {
+    name: 'transfer/detect-pii',
+    description: 'Scan patterns for PII without redacting',
+    category: 'transfer',
+    version: '1.0.0',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        input: {
+          type: 'string',
+          description: 'Input file or directory to scan',
+          required: true
+        },
+        detectors: {
+          type: 'array',
+          items: { type: 'string' },
+          default: ['email', 'phone', 'ip', 'path', 'apiKey'],
+          description: 'PII detectors to run'
+        },
+        outputFormat: {
+          type: 'string',
+          enum: ['summary', 'detailed', 'json'],
+          default: 'summary',
+          description: 'Output format'
+        }
+      },
+      required: ['input']
+    },
+    handler: async (input) => {
+      const { detectPii } = await import('../transfer/anonymization/detectors.js');
+      return detectPii(input);
+    }
+  },
+
+  // ═══════════════════════════════════════════════════════════════
+  // IPFS TOOLS
+  // ═══════════════════════════════════════════════════════════════
+  {
+    name: 'transfer/ipfs-upload',
+    description: 'Upload patterns to IPFS with optional pinning',
+    category: 'transfer',
+    version: '1.0.0',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        input: {
+          type: 'string',
+          description: 'Input file path',
+          required: true
+        },
+        pin: {
+          type: 'boolean',
+          default: true,
+          description: 'Pin to pinning service'
+        },
+        pinningService: {
+          type: 'string',
+          enum: ['pinata', 'web3storage', 'infura', 'custom'],
+          default: 'pinata',
+          description: 'Pinning service to use'
+        },
+        gateway: {
+          type: 'string',
+          default: 'https://w3s.link',
+          description: 'IPFS gateway URL'
+        },
+        name: {
+          type: 'string',
+          description: 'Human-readable name for the upload'
+        },
+        wrapWithDirectory: {
+          type: 'boolean',
+          default: false,
+          description: 'Wrap file in IPFS directory'
+        }
+      },
+      required: ['input']
+    },
+    handler: async (input) => {
+      const { uploadToIpfs } = await import('../transfer/ipfs/upload.js');
+      return uploadToIpfs(input);
+    }
+  },
+
+  {
+    name: 'transfer/ipfs-download',
+    description: 'Download patterns from IPFS',
+    category: 'transfer',
+    version: '1.0.0',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        cid: {
+          type: 'string',
+          description: 'IPFS Content ID (CID)',
+          required: true
+        },
+        output: {
+          type: 'string',
+          description: 'Output file path',
+          required: true
+        },
+        gateway: {
+          type: 'string',
+          default: 'https://w3s.link',
+          description: 'IPFS gateway URL'
+        },
+        timeout: {
+          type: 'number',
+          default: 30000,
+          description: 'Download timeout in milliseconds'
+        },
+        verify: {
+          type: 'boolean',
+          default: true,
+          description: 'Verify content integrity'
+        }
+      },
+      required: ['cid', 'output']
+    },
+    handler: async (input) => {
+      const { downloadFromIpfs } = await import('../transfer/ipfs/download.js');
+      return downloadFromIpfs(input);
+    }
+  },
+
+  {
+    name: 'transfer/ipfs-pin',
+    description: 'Pin or unpin IPFS content',
+    category: 'transfer',
+    version: '1.0.0',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        cid: {
+          type: 'string',
+          description: 'IPFS Content ID (CID)',
+          required: true
+        },
+        action: {
+          type: 'string',
+          enum: ['pin', 'unpin'],
+          default: 'pin',
+          description: 'Pin action'
+        },
+        service: {
+          type: 'string',
+          enum: ['pinata', 'web3storage', 'infura', 'custom'],
+          default: 'pinata',
+          description: 'Pinning service'
+        },
+        name: {
+          type: 'string',
+          description: 'Pin name for organization'
+        }
+      },
+      required: ['cid']
+    },
+    handler: async (input) => {
+      const { managePins } = await import('../transfer/ipfs/pinning.js');
+      return managePins(input);
+    }
+  },
+
+  {
+    name: 'transfer/ipfs-resolve',
+    description: 'Resolve IPNS name to CID',
+    category: 'transfer',
+    version: '1.0.0',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          description: 'IPNS name to resolve',
+          required: true
+        },
+        recursive: {
+          type: 'boolean',
+          default: true,
+          description: 'Resolve recursively'
+        }
+      },
+      required: ['name']
+    },
+    handler: async (input) => {
+      const { resolveIpns } = await import('../transfer/ipfs/ipns.js');
+      return resolveIpns(input);
+    }
+  },
+
+  // ═══════════════════════════════════════════════════════════════
+  // PATTERN STORE TOOLS
+  // ═══════════════════════════════════════════════════════════════
+  {
+    name: 'transfer/store-search',
+    description: 'Search the pattern store',
+    category: 'transfer',
+    version: '1.0.0',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'Search query'
+        },
+        category: {
+          type: 'string',
+          description: 'Filter by category'
+        },
+        language: {
+          type: 'string',
+          description: 'Filter by programming language'
+        },
+        framework: {
+          type: 'string',
+          description: 'Filter by framework'
+        },
+        minRating: {
+          type: 'number',
+          minimum: 0,
+          maximum: 5,
+          description: 'Minimum rating'
+        },
+        minDownloads: {
+          type: 'number',
+          minimum: 0,
+          description: 'Minimum download count'
+        },
+        verified: {
+          type: 'boolean',
+          description: 'Only show verified patterns'
+        },
+        limit: {
+          type: 'number',
+          default: 20,
+          description: 'Maximum results'
+        },
+        offset: {
+          type: 'number',
+          default: 0,
+          description: 'Result offset for pagination'
+        }
+      }
+    },
+    handler: async (input) => {
+      const { searchStore } = await import('../transfer/store/search.js');
+      return searchStore(input);
+    }
+  },
+
+  {
+    name: 'transfer/store-info',
+    description: 'Get detailed info about a pattern',
+    category: 'transfer',
+    version: '1.0.0',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          description: 'Pattern name',
+          required: true
+        },
+        version: {
+          type: 'string',
+          description: 'Specific version (default: latest)'
+        },
+        includeChangelog: {
+          type: 'boolean',
+          default: false,
+          description: 'Include version changelog'
+        }
+      },
+      required: ['name']
+    },
+    handler: async (input) => {
+      const { getPatternInfo } = await import('../transfer/store/registry.js');
+      return getPatternInfo(input);
+    }
+  },
+
+  {
+    name: 'transfer/store-install',
+    description: 'Install a pattern from the store',
+    category: 'transfer',
+    version: '1.0.0',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          description: 'Pattern name',
+          required: true
+        },
+        version: {
+          type: 'string',
+          default: 'latest',
+          description: 'Version to install'
+        },
+        strategy: {
+          type: 'string',
+          enum: ['replace', 'merge', 'append'],
+          default: 'merge',
+          description: 'Import strategy'
+        },
+        skipVerification: {
+          type: 'boolean',
+          default: false,
+          description: 'Skip signature verification'
+        }
+      },
+      required: ['name']
+    },
+    handler: async (input) => {
+      const { installPattern } = await import('../transfer/store/install.js');
+      return installPattern(input);
+    }
+  },
+
+  {
+    name: 'transfer/store-publish',
+    description: 'Publish patterns to the store',
+    category: 'transfer',
+    version: '1.0.0',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        input: {
+          type: 'string',
+          description: 'Input pattern file',
+          required: true
+        },
+        name: {
+          type: 'string',
+          description: 'Pattern name',
+          required: true
+        },
+        description: {
+          type: 'string',
+          description: 'Pattern description',
+          required: true
+        },
+        category: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Categories'
+        },
+        tags: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Tags for discovery'
+        },
+        license: {
+          type: 'string',
+          default: 'MIT',
+          description: 'SPDX license identifier'
+        },
+        language: {
+          type: 'string',
+          description: 'Primary programming language'
+        },
+        framework: {
+          type: 'string',
+          description: 'Primary framework'
+        },
+        anonymize: {
+          type: 'string',
+          enum: ['minimal', 'standard', 'strict', 'paranoid'],
+          default: 'strict',
+          description: 'Anonymization level before publishing'
+        }
+      },
+      required: ['input', 'name', 'description']
+    },
+    handler: async (input) => {
+      const { publishPattern } = await import('../transfer/store/publish.js');
+      return publishPattern(input);
+    }
+  },
+
+  {
+    name: 'transfer/store-rate',
+    description: 'Rate a pattern from the store',
+    category: 'transfer',
+    version: '1.0.0',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          description: 'Pattern name',
+          required: true
+        },
+        rating: {
+          type: 'number',
+          minimum: 1,
+          maximum: 5,
+          description: 'Rating (1-5 stars)',
+          required: true
+        },
+        comment: {
+          type: 'string',
+          description: 'Optional review comment'
+        }
+      },
+      required: ['name', 'rating']
+    },
+    handler: async (input) => {
+      const { ratePattern } = await import('../transfer/store/registry.js');
+      return ratePattern(input);
+    }
+  },
+
+  // ═══════════════════════════════════════════════════════════════
+  // SECURITY & VERIFICATION TOOLS
+  // ═══════════════════════════════════════════════════════════════
+  {
+    name: 'transfer/verify',
+    description: 'Verify pattern signature and integrity',
+    category: 'transfer',
+    version: '1.0.0',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        input: {
+          type: 'string',
+          description: 'Pattern file to verify',
+          required: true
+        },
+        checkSignature: {
+          type: 'boolean',
+          default: true,
+          description: 'Verify cryptographic signature'
+        },
+        checkIntegrity: {
+          type: 'boolean',
+          default: true,
+          description: 'Verify checksum integrity'
+        },
+        scanMalware: {
+          type: 'boolean',
+          default: true,
+          description: 'Scan for malicious patterns'
+        },
+        trustedAuthors: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'List of trusted author public keys'
+        }
+      },
+      required: ['input']
+    },
+    handler: async (input) => {
+      const { verifyPattern } = await import('../transfer/security/verification.js');
+      return verifyPattern(input);
+    }
+  },
+
+  {
+    name: 'transfer/sign',
+    description: 'Sign patterns with Ed25519 key',
+    category: 'transfer',
+    version: '1.0.0',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        input: {
+          type: 'string',
+          description: 'Pattern file to sign',
+          required: true
+        },
+        output: {
+          type: 'string',
+          description: 'Output file (default: overwrites input)'
+        },
+        privateKey: {
+          type: 'string',
+          description: 'Path to Ed25519 private key file'
+        },
+        keyId: {
+          type: 'string',
+          description: 'Key ID from keyring'
+        }
+      },
+      required: ['input']
+    },
+    handler: async (input) => {
+      const { signPattern } = await import('../transfer/security/verification.js');
+      return signPattern(input);
+    }
+  },
+
+  {
+    name: 'transfer/generate-keypair',
+    description: 'Generate Ed25519 signing keypair',
+    category: 'transfer',
+    version: '1.0.0',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        output: {
+          type: 'string',
+          description: 'Output directory for keypair',
+          required: true
+        },
+        name: {
+          type: 'string',
+          default: 'patterns',
+          description: 'Key name prefix'
+        },
+        addToKeyring: {
+          type: 'boolean',
+          default: true,
+          description: 'Add to local keyring'
+        }
+      },
+      required: ['output']
+    },
+    handler: async (input) => {
+      const { generateKeypair } = await import('../transfer/security/verification.js');
+      return generateKeypair(input);
+    }
+  }
+];
+```
+
+### MCP Tool Registration
+
+```typescript
+// v3/@claude-flow/cli/src/mcp-tools/index.ts
+
+import { transferTools } from './transfer-tools.js';
+
+// Add to existing tools array
+export const allTools: MCPTool[] = [
+  // ... existing tools
+  ...transferTools,
+];
+
+// Category registration
+export const toolCategories = {
+  // ... existing categories
+  transfer: {
+    name: 'Transfer',
+    description: 'Pattern export, import, anonymization, and sharing',
+    tools: transferTools.map(t => t.name),
+  },
+};
+```
+
+### MCP Tool Usage Examples
+
+```typescript
+// Export patterns via MCP
+await mcp__claude_flow__transfer_export({
+  output: './patterns/team-patterns.cfp',
+  anonymize: 'strict',
+  redactPii: true,
+  types: ['routing', 'complexity'],
+  minConfidence: 0.7
+});
+
+// Import from IPFS via MCP
+await mcp__claude_flow__transfer_import({
+  fromIpfs: 'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi',
+  strategy: 'merge',
+  verifySignature: true
+});
+
+// Search pattern store via MCP
+const results = await mcp__claude_flow__transfer_store_search({
+  query: 'react typescript',
+  category: 'routing',
+  minRating: 4.0,
+  verified: true,
+  limit: 10
+});
+
+// Upload to IPFS via MCP
+const { cid, gateway } = await mcp__claude_flow__transfer_ipfs_upload({
+  input: './patterns.cfp',
+  pin: true,
+  pinningService: 'pinata',
+  name: 'my-optimized-patterns'
+});
+
+// Verify pattern integrity via MCP
+const verification = await mcp__claude_flow__transfer_verify({
+  input: './downloaded-patterns.cfp',
+  checkSignature: true,
+  scanMalware: true
+});
+```
+
+### MCP Tool to CLI Mapping
+
+| MCP Tool | CLI Command |
+|----------|-------------|
+| `transfer/export` | `hooks transfer export` |
+| `transfer/import` | `hooks transfer import` |
+| `transfer/anonymize` | `hooks transfer anonymize` |
+| `transfer/detect-pii` | `hooks transfer detect-pii` |
+| `transfer/ipfs-upload` | `hooks transfer ipfs upload` |
+| `transfer/ipfs-download` | `hooks transfer ipfs download` |
+| `transfer/ipfs-pin` | `hooks transfer ipfs pin` |
+| `transfer/ipfs-resolve` | `hooks transfer ipfs resolve` |
+| `transfer/store-search` | `hooks transfer store search` |
+| `transfer/store-info` | `hooks transfer store info` |
+| `transfer/store-install` | `hooks transfer store install` |
+| `transfer/store-publish` | `hooks transfer store publish` |
+| `transfer/store-rate` | `hooks transfer store rate` |
+| `transfer/verify` | `hooks transfer verify` |
+| `transfer/sign` | `hooks transfer sign` |
+| `transfer/generate-keypair` | `hooks transfer generate-keypair` |
+
+---
+
 ## References
 
 - ADR-017: RuVector Integration Architecture
