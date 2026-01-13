@@ -44,10 +44,36 @@
 
 | Command | Version | MCP Server |
 |---------|---------|------------|
-| `npx @claude-flow/cli@3.0.0-alpha.86` | v3.0.0-alpha.86 | 27 tools, started in 1.55ms |
-| `npx claude-flow@alpha` | v3.0.0-alpha.86 | 27 tools, started in 1.61ms |
+| `npx @claude-flow/cli@alpha` | v3.0.0-alpha.87 | **171 tools**, 19 categories |
+| `npx claude-flow@v3alpha` | v3.0.0-alpha.34 | **171 tools**, 19 categories |
 
 **Fix Applied:** Pinned exact CLI version in wrapper package to avoid semver resolution to buggy 3.0.x versions. Deprecated versions 3.0.0, 3.0.1, 3.0.2.
+
+### MCP Tool Categories (alpha.87)
+
+| Category | Tools | Description |
+|----------|-------|-------------|
+| agent | 7 | Agent lifecycle management |
+| swarm | 4 | Swarm coordination |
+| memory | 6 | Memory operations |
+| config | 6 | Configuration management |
+| task | 6 | Task management |
+| session | 5 | Session persistence |
+| workflow | 9 | Workflow automation |
+| hive-mind | 7 | Byzantine consensus |
+| analyze | 6 | Code analysis |
+| claims | 12 | Issue claims system |
+| embeddings | 7 | Vector embeddings |
+| transfer | 11 | Pattern transfer/IPFS |
+| progress | 4 | V3 progress tracking |
+| **system** | 5 | System status/health (V2) |
+| **terminal** | 5 | Terminal sessions (V2) |
+| **neural** | 6 | Neural ML tools (V2) |
+| **performance** | 6 | Performance profiling (V2) |
+| **github** | 5 | GitHub integration (V2) |
+| **daa** | 8 | Decentralized agents (V2) |
+| **coordination** | 7 | Swarm coordination (V2) |
+| (hooks) | 45 | Hooks system |
 
 ### Beta Readiness Checklist
 
