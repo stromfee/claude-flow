@@ -1253,6 +1253,7 @@ npx claude-flow@v3alpha worker status
 | `transfer-store` | 4 | Pattern marketplace via IPFS (list, search, download, publish) |
 | `update` | 2 | Auto-update system (check, apply) |
 | `route` | 3 | Intelligent routing (task, explain, coverage) |
+| `ruvector` | 6 | PostgreSQL Bridge (init, migrate, status, benchmark, optimize, backup) |
 
 </details>
 
