@@ -131,7 +131,7 @@ export function serializeToBuffer(cfp: CFPFormat, format: SerializationFormat): 
     case 'msgpack':
       // Fallback to JSON for now
       // In production: use cbor-x, msgpack-lite, etc.
-      console.warn(`Format ${format} not implemented, using JSON`);
+      console.error(`Format ${format} not implemented, using JSON`);
       return Buffer.from(json, 'utf-8');
     default:
       return Buffer.from(json, 'utf-8');

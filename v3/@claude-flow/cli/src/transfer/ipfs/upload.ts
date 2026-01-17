@@ -228,10 +228,10 @@ export async function uploadToIPFS(
       if (isAvailable) {
         return await uploadToLocalIPFS(content, options);
       } else {
-        console.warn(`[IPFS] Local node at ${localIPFS || 'localhost:5001'} not available`);
+        console.error(`[IPFS] Local node at ${localIPFS || 'localhost:5001'} not available`);
       }
     } catch (error) {
-      console.warn(`[IPFS] Local IPFS upload failed: ${error}`);
+      console.error(`[IPFS] Local IPFS upload failed: ${error}`);
     }
   }
 
@@ -240,7 +240,7 @@ export async function uploadToIPFS(
     try {
       return await uploadToPinata(content, options);
     } catch (error) {
-      console.warn(`[IPFS] Pinata upload failed: ${error}`);
+      console.error(`[IPFS] Pinata upload failed: ${error}`);
     }
   }
 
@@ -249,17 +249,17 @@ export async function uploadToIPFS(
     try {
       return await uploadToWeb3Storage(content, options);
     } catch (error) {
-      console.warn(`[IPFS] Web3.storage upload failed: ${error}`);
+      console.error(`[IPFS] Web3.storage upload failed: ${error}`);
     }
   }
 
   // Fall back to demo mode - WARN user prominently
-  console.warn(`⚠ [IPFS] DEMO MODE - No IPFS credentials configured`);
-  console.warn(`⚠ [IPFS] Content will NOT be uploaded to decentralized storage`);
-  console.warn(`⚠ [IPFS] To enable real uploads, configure one of:`);
-  console.warn(`⚠ [IPFS]   - IPFS_API_URL=http://YOUR_NODE:5001 (FREE - your own node)`);
-  console.warn(`⚠ [IPFS]   - WEB3_STORAGE_TOKEN (free 5GB at web3.storage)`);
-  console.warn(`⚠ [IPFS]   - PINATA_API_KEY + PINATA_SECRET_KEY (free tier available)`);
+  console.error(`⚠ [IPFS] DEMO MODE - No IPFS credentials configured`);
+  console.error(`⚠ [IPFS] Content will NOT be uploaded to decentralized storage`);
+  console.error(`⚠ [IPFS] To enable real uploads, configure one of:`);
+  console.error(`⚠ [IPFS]   - IPFS_API_URL=http://YOUR_NODE:5001 (FREE - your own node)`);
+  console.error(`⚠ [IPFS]   - WEB3_STORAGE_TOKEN (free 5GB at web3.storage)`);
+  console.error(`⚠ [IPFS]   - PINATA_API_KEY + PINATA_SECRET_KEY (free tier available)`);
 
   const cid = generateDemoCID(content);
   const size = content.length;
@@ -321,7 +321,7 @@ export async function pinContent(
         return { success: true, pinnedAt };
       }
     } catch (error) {
-      console.warn(`[IPFS] Pinata pin failed: ${error}`);
+      console.error(`[IPFS] Pinata pin failed: ${error}`);
     }
   }
 
@@ -360,7 +360,7 @@ export async function unpinContent(
         return { success: true };
       }
     } catch (error) {
-      console.warn(`[IPFS] Pinata unpin failed: ${error}`);
+      console.error(`[IPFS] Pinata unpin failed: ${error}`);
     }
   }
 

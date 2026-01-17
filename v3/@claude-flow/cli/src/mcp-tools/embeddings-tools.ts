@@ -103,7 +103,7 @@ async function generateRealEmbedding(text: string, dimension: number): Promise<n
   }
 
   // Fallback: deterministic hash-based (only if ONNX truly unavailable)
-  console.warn('[MCP] ONNX unavailable, using fallback embedding');
+  console.error('[MCP] ONNX unavailable, using fallback embedding');
   const embedding: number[] = [];
   let hash = 0;
   for (let i = 0; i < text.length; i++) {

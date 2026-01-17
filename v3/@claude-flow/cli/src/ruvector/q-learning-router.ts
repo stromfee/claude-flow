@@ -251,7 +251,7 @@ export class QLearningRouter {
 
       // Validate version compatibility
       if (!model.version || !model.version.startsWith('1.')) {
-        console.warn(`[Q-Learning] Incompatible model version: ${model.version}`);
+        console.error(`[Q-Learning] Incompatible model version: ${model.version}`);
         return false;
       }
 
@@ -267,7 +267,7 @@ export class QLearningRouter {
 
       return true;
     } catch (err) {
-      console.warn(`[Q-Learning] Failed to load model: ${err}`);
+      console.error(`[Q-Learning] Failed to load model: ${err}`);
       return false;
     }
   }
@@ -308,7 +308,7 @@ export class QLearningRouter {
       writeFileSync(modelPath, JSON.stringify(model, null, 2));
       return true;
     } catch (err) {
-      console.warn(`[Q-Learning] Failed to save model: ${err}`);
+      console.error(`[Q-Learning] Failed to save model: ${err}`);
       return false;
     }
   }

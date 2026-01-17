@@ -116,7 +116,7 @@ export class PatternDiscovery {
     if (knownRegistry.trusted && registry.registrySignature) {
       const verified = this.verifyRegistry(registry, knownRegistry.publicKey);
       if (!verified) {
-        console.warn(`[Discovery] Warning: Registry signature verification failed`);
+        console.error(`[Discovery] Warning: Registry signature verification failed`);
       }
     }
 
@@ -202,14 +202,14 @@ export class PatternDiscovery {
           }
         }
       } catch (error) {
-        console.warn(`[Discovery] IPNS resolution via ${gateway} failed:`, error);
+        console.error(`[Discovery] IPNS resolution via ${gateway} failed:`, error);
         // Continue to next gateway
       }
     }
 
     // Fallback: Generate deterministic CID for well-known registries
-    console.warn(`⚠ [Discovery] OFFLINE MODE - Could not resolve IPNS: ${ipnsName}`);
-    console.warn(`⚠ [Discovery] Using built-in fallback registry (may be outdated)`);
+    console.error(`⚠ [Discovery] OFFLINE MODE - Could not resolve IPNS: ${ipnsName}`);
+    console.error(`⚠ [Discovery] Using built-in fallback registry (may be outdated)`);
     const fallbackCid = this.generateFallbackCID(ipnsName);
     const resolution: IPNSResolution = {
       ipnsName,
@@ -259,7 +259,7 @@ export class PatternDiscovery {
         }
       }
     } catch (error) {
-      console.warn(`[Discovery] Fetch from ${gateway} failed:`, error);
+      console.error(`[Discovery] Fetch from ${gateway} failed:`, error);
     }
 
     // Try alternative gateways

@@ -91,7 +91,7 @@ export class PatternDownloader {
       if (options.verify !== false) {
         verified = this.verifyChecksum(content, pattern.checksum);
         if (!verified) {
-          console.warn(`[Download] Warning: Checksum verification failed!`);
+          console.error(`[Download] Warning: Checksum verification failed!`);
           if (this.config.requireVerification) {
             return {
               success: false,
@@ -109,7 +109,7 @@ export class PatternDownloader {
       if (pattern.signature && pattern.publicKey) {
         const sigVerified = this.verifySignature(content, pattern.signature, pattern.publicKey);
         if (!sigVerified) {
-          console.warn(`[Download] Warning: Signature verification failed!`);
+          console.error(`[Download] Warning: Signature verification failed!`);
         } else {
           console.log(`[Download] Signature verified!`);
         }

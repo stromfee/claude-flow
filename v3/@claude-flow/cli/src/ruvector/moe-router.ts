@@ -454,12 +454,12 @@ export class MoERouter {
     const expertIdx = typeof expert === 'number' ? expert : EXPERT_NAMES.indexOf(expert);
 
     if (expertIdx < 0 || expertIdx >= NUM_EXPERTS) {
-      console.warn(`[MoE] Invalid expert: ${expert}`);
+      console.error(`[MoE] Invalid expert: ${expert}`);
       return;
     }
 
     if (!this.lastInput || !this.lastHiddenActivated || !this.lastProbs) {
-      console.warn('[MoE] No cached forward pass for gradient computation');
+      console.error('[MoE] No cached forward pass for gradient computation');
       return;
     }
 
@@ -627,7 +627,7 @@ export class MoERouter {
 
       // Validate version
       if (!model.version || !model.version.startsWith('1.')) {
-        console.warn(`[MoE] Incompatible model version: ${model.version}`);
+        console.error(`[MoE] Incompatible model version: ${model.version}`);
         return false;
       }
 
@@ -647,7 +647,7 @@ export class MoERouter {
 
       return true;
     } catch (err) {
-      console.warn(`[MoE] Failed to load weights: ${err}`);
+      console.error(`[MoE] Failed to load weights: ${err}`);
       return false;
     }
   }
@@ -703,7 +703,7 @@ export class MoERouter {
       writeFileSync(weightsPath, JSON.stringify(model, null, 2));
       return true;
     } catch (err) {
-      console.warn(`[MoE] Failed to save weights: ${err}`);
+      console.error(`[MoE] Failed to save weights: ${err}`);
       return false;
     }
   }
@@ -801,7 +801,7 @@ export function getMoERouter(config?: Partial<MoERouterConfig>): MoERouter {
     moeRouterInstance = new MoERouter(config);
     // Initialize in background (load weights)
     moeRouterInstance.initialize().catch((err) => {
-      console.warn('[MoE] Failed to initialize router:', err);
+      console.error('[MoE] Failed to initialize router:', err);
     });
   }
   return moeRouterInstance;

@@ -25,7 +25,7 @@ export async function resolveIPNS(
     // In production, this would do actual IPNS resolution
     return null;
   } catch (error) {
-    console.warn(`[IPFS] IPNS resolution failed:`, error);
+    console.error(`[IPFS] IPNS resolution failed:`, error);
     return null;
   }
 }
@@ -52,7 +52,7 @@ export async function fetchFromIPFS<T>(
 
     return null;
   } catch (error) {
-    console.warn(`[IPFS] Fetch failed:`, error);
+    console.error(`[IPFS] Fetch failed:`, error);
     return null;
   }
 }

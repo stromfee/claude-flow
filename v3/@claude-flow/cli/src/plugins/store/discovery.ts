@@ -124,7 +124,7 @@ export class PluginDiscoveryService {
       if (this.config.requireVerification && registryData.registrySignature) {
         const verified = this.verifyRegistrySignature(registryData, registry.publicKey);
         if (!verified) {
-          console.warn(`[PluginDiscovery] Registry signature verification failed`);
+          console.error(`[PluginDiscovery] Registry signature verification failed`);
         }
       }
 
