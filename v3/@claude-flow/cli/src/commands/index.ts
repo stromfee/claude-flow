@@ -119,6 +119,7 @@ import { neuralCommand } from './neural.js';
 import { performanceCommand } from './performance.js';
 import { securityCommand } from './security.js';
 import { ruvectorCommand } from './ruvector/index.js';
+import { hiveMindCommand } from './hive-mind.js';
 
 // Pre-populate cache with core commands
 loadedCommands.set('init', initCommand);
@@ -137,7 +138,11 @@ loadedCommands.set('embeddings', embeddingsCommand);
 loadedCommands.set('neural', neuralCommand);
 loadedCommands.set('performance', performanceCommand);
 loadedCommands.set('security', securityCommand);
+<<<<<<< HEAD
 loadedCommands.set('ruvector', ruvectorCommand);
+=======
+loadedCommands.set('hive-mind', hiveMindCommand);
+>>>>>>> main
 
 // =============================================================================
 // Exports (maintain backwards compatibility)
@@ -160,7 +165,11 @@ export { embeddingsCommand } from './embeddings.js';
 export { neuralCommand } from './neural.js';
 export { performanceCommand } from './performance.js';
 export { securityCommand } from './security.js';
+<<<<<<< HEAD
 export { ruvectorCommand } from './ruvector/index.js';
+=======
+export { hiveMindCommand } from './hive-mind.js';
+>>>>>>> main
 
 // Lazy-loaded command re-exports (for backwards compatibility, but async-only)
 export async function getConfigCommand() { return loadCommand('config'); }
@@ -207,7 +216,11 @@ export const commands: Command[] = [
   neuralCommand,
   performanceCommand,
   securityCommand,
+<<<<<<< HEAD
   ruvectorCommand,
+=======
+  hiveMindCommand,
+>>>>>>> main
 ];
 
 /**
