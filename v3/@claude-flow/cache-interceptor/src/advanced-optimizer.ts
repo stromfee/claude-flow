@@ -529,6 +529,10 @@ export class AdvancedOptimizer {
 
   /**
    * Optimize messages using all three intelligence systems
+   *
+   * CRITICAL: Maintains tool_use/tool_result pairs to avoid API errors.
+   * The Anthropic API requires that every tool_result references a tool_use
+   * in the immediately preceding assistant message.
    */
   async optimize(
     messages: Array<{ line: string; parsed: unknown }>,
@@ -543,6 +547,10 @@ export class AdvancedOptimizer {
       parsed: m.parsed as ParsedMessage['parsed'],
       tokens: Math.ceil(m.line.length / 4), // Approximate token count
     }));
+
+    // CRITICAL: Build tool_use -> tool_result pair mappings
+    // Tool pairs must be kept or removed together to maintain API validity
+    const toolUsePairs = this.buildToolUsePairs(parsedMessages);
 
     const originalTokens = parsedMessages.reduce((sum, m) => sum + m.tokens, 0);
     const originalCount = parsedMessages.length;
