@@ -1162,6 +1162,7 @@ function cleanup(): void {
 
 /**
  * Install the interceptor (patches fs module)
+ * Uses Module._load hook for compatibility with modern Node.js
  */
 export async function install(): Promise<void> {
   await initDatabase();
@@ -1171,9 +1172,51 @@ export async function install(): Promise<void> {
     return;
   }
 
-  // Patch fs module
-  (fs as any).readFileSync = interceptedReadFileSync;
-  (fs as any).appendFileSync = interceptedAppendFileSync;
+  // Modern Node.js protects fs properties, so we use Module hook instead
+  try {
+    const Module = require('module');
+    const originalLoad = Module._load;
+
+    Module._load = function(request: string, parent: any, isMain: boolean) {
+      const result = originalLoad.call(this, request, parent, isMain);
+
+      // Intercept fs module
+      if (request === 'fs' || request === 'node:fs') {
+        // Return a proxy that wraps fs functions
+        return new Proxy(result, {
+          get(target, prop) {
+            if (prop === 'readFileSync') {
+              return interceptedReadFileSync;
+            }
+            if (prop === 'appendFileSync') {
+              return interceptedAppendFileSync;
+            }
+            return target[prop];
+          }
+        });
+      }
+      return result;
+    };
+
+    logInfo('Installed via Module._load hook');
+  } catch (err) {
+    // Fallback: try direct assignment (older Node.js)
+    try {
+      Object.defineProperty(fs, 'readFileSync', {
+        value: interceptedReadFileSync,
+        writable: true,
+        configurable: true,
+      });
+      Object.defineProperty(fs, 'appendFileSync', {
+        value: interceptedAppendFileSync,
+        writable: true,
+        configurable: true,
+      });
+      logInfo('Installed via defineProperty');
+    } catch (e) {
+      logError(`Could not patch fs: ${e}`);
+    }
+  }
 
   // Handle process exit - cleanup sessions and persist
   process.on('exit', cleanup);
