@@ -8,7 +8,6 @@ import type {
   LatencyMetrics,
   PercentileMetrics,
   BenchmarkConfig,
-  CacheOptimizerConfig,
 } from '../types.js';
 import { DEFAULT_CONFIG } from '../types.js';
 import type { CacheOptimizer } from '../core/orchestrator.js';
