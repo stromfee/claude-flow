@@ -346,6 +346,48 @@ export class CacheOptimizer {
       }
     }
 
+    // Third pass: Use hyperbolic drift detection for additional optimization
+    if (this.useHyperbolic && freedTokens < tokensToFree) {
+      const entries = Array.from(this.entries.values());
+      const driftAnalysis = this.hyperbolicIntelligence.analyzeDrift(entries);
+
+      if (driftAnalysis.isDrifting) {
+        this.driftEvents++;
+
+        // Get hyperbolic-guided pruning suggestions
+        const hyperbolicDecision = this.hyperbolicIntelligence.getOptimalPruningDecision(
+          entries.filter(e => !toPrune.includes(e.id) && !toCompress.includes(e.id) && !this.shouldPreserve(e)),
+          this.config.targetUtilization
+        );
+
+        // Add hyperbolic suggestions
+        for (const id of hyperbolicDecision.toPrune) {
+          if (!toPrune.includes(id)) {
+            const entry = this.entries.get(id);
+            if (entry) {
+              toPrune.push(id);
+              freedTokens += entry.compressed?.compressedTokens ?? entry.tokens;
+              this.driftCorrections++;
+            }
+          }
+        }
+
+        for (const id of hyperbolicDecision.toCompress) {
+          if (!toCompress.includes(id) && !toPrune.includes(id)) {
+            const entry = this.entries.get(id);
+            if (entry && entry.tier !== 'cold') {
+              toCompress.push(id);
+              toDemote.push(id);
+              const savings = (entry.compressed?.compressedTokens ?? entry.tokens) *
+                (1 - this.config.temporal.tiers.cold.compressionRatio);
+              freedTokens += savings;
+              this.driftCorrections++;
+            }
+          }
+        }
+      }
+    }
+
     const projectedUtilization = (this.tokenCounter.getMetrics().currentTokens - freedTokens) /
       this.config.contextWindowSize;
 
