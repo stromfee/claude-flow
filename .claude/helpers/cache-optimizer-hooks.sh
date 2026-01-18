@@ -155,7 +155,8 @@ record_event() {
         ;;
     esac
 
-    jq ".graphNodes = $nodes | .lastUpdate = \"$(date -Iseconds)\"" "$state_file" > "${state_file}.tmp" && mv "${state_file}.tmp" "$state_file"
+    local update_date=$(get_iso_date)
+    jq ".graphNodes = $nodes | .lastUpdate = \"$update_date\"" "$state_file" > "${state_file}.tmp" && mv "${state_file}.tmp" "$state_file"
   fi
 
   return 0
