@@ -1,48 +1,177 @@
 /**
  * Claude Code Cache Interceptor
  *
- * Intercepts Claude Code's file I/O operations and redirects them through
- * an optimized SQLite-backed storage layer using sql.js.
+ * Cross-platform (Linux, macOS, Windows) interceptor that redirects
+ * Claude Code's file I/O through an optimized SQLite-backed storage layer.
  *
  * Usage:
  *   NODE_OPTIONS="--require /path/to/interceptor.js" claude
  *
- * Or via wrapper script:
- *   claude-optimized (which sets NODE_OPTIONS and runs claude)
+ * Or via wrapper:
+ *   claude-optimized (sets NODE_OPTIONS and runs claude)
  */
 
 import * as fs from 'fs';
 import * as path from 'path';
+import * as os from 'os';
 import initSqlJs, { Database } from 'sql.js';
 
-// Configuration
-const CLAUDE_PROJECTS_DIR = path.join(process.env.HOME || '', '.claude', 'projects');
-const INTERCEPTOR_DB_PATH = path.join(process.env.HOME || '', '.claude-flow', 'cache-interceptor.db');
-const INTERCEPT_PATTERNS = [
-  /\.claude\/projects\/.*\.jsonl$/,
-  /\.claude\/history\.jsonl$/,
-];
+// ============================================================================
+// Cross-Platform Path Resolution
+// ============================================================================
 
-// State
+function getClaudeDir(): string {
+  const platform = os.platform();
+  const home = os.homedir();
+
+  switch (platform) {
+    case 'win32':
+      // Windows: %APPDATA%\Claude or %USERPROFILE%\.claude
+      return process.env.APPDATA
+        ? path.join(process.env.APPDATA, 'Claude')
+        : path.join(home, '.claude');
+    case 'darwin':
+      // macOS: ~/Library/Application Support/Claude or ~/.claude
+      const macSupport = path.join(home, 'Library', 'Application Support', 'Claude');
+      if (fs.existsSync(macSupport)) return macSupport;
+      return path.join(home, '.claude');
+    default:
+      // Linux and others: ~/.claude
+      return path.join(home, '.claude');
+  }
+}
+
+function getInterceptorDbPath(): string {
+  const platform = os.platform();
+  const home = os.homedir();
+
+  switch (platform) {
+    case 'win32':
+      return process.env.APPDATA
+        ? path.join(process.env.APPDATA, 'claude-flow', 'cache-interceptor.db')
+        : path.join(home, '.claude-flow', 'cache-interceptor.db');
+    default:
+      return path.join(home, '.claude-flow', 'cache-interceptor.db');
+  }
+}
+
+// Configuration
+const CLAUDE_DIR = getClaudeDir();
+const CLAUDE_PROJECTS_DIR = path.join(CLAUDE_DIR, 'projects');
+const INTERCEPTOR_DB_PATH = getInterceptorDbPath();
+
+// Cross-platform path pattern matching
+function createInterceptPatterns(): RegExp[] {
+  const sep = path.sep.replace(/\\/g, '\\\\'); // Escape backslash for regex
+  return [
+    new RegExp(`\\.claude${sep}projects${sep}.*\\.jsonl$`),
+    new RegExp(`\\.claude${sep}history\\.jsonl$`),
+    // Also match forward slashes (normalized paths)
+    /\.claude\/projects\/.*\.jsonl$/,
+    /\.claude\/history\.jsonl$/,
+  ];
+}
+
+const INTERCEPT_PATTERNS = createInterceptPatterns();
+
+// ============================================================================
+// State Management
+// ============================================================================
+
 let db: Database | null = null;
 let initialized = false;
+let sqlJsPromise: Promise<void> | null = null;
 
 // Original fs functions (before patching)
 const originalFs = {
-  readFileSync: fs.readFileSync,
-  writeFileSync: fs.writeFileSync,
-  appendFileSync: fs.appendFileSync,
-  existsSync: fs.existsSync,
-  statSync: fs.statSync,
-  readdirSync: fs.readdirSync,
+  readFileSync: fs.readFileSync.bind(fs),
+  writeFileSync: fs.writeFileSync.bind(fs),
+  appendFileSync: fs.appendFileSync.bind(fs),
+  existsSync: fs.existsSync.bind(fs),
+  statSync: fs.statSync.bind(fs),
+  readdirSync: fs.readdirSync.bind(fs),
+  mkdirSync: fs.mkdirSync.bind(fs),
 };
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+/**
+ * Normalize path for cross-platform comparison
+ */
+function normalizePath(filePath: string): string {
+  return path.normalize(filePath).replace(/\\/g, '/');
+}
 
 /**
  * Check if a path should be intercepted
  */
 function shouldIntercept(filePath: string): boolean {
-  const normalized = path.normalize(filePath);
+  const normalized = normalizePath(filePath);
   return INTERCEPT_PATTERNS.some(pattern => pattern.test(normalized));
+}
+
+/**
+ * Parse session ID from file path (cross-platform)
+ */
+function parseSessionId(filePath: string): string | null {
+  const normalized = normalizePath(filePath);
+  const match = normalized.match(/([a-f0-9-]{36})\.jsonl$/);
+  return match ? match[1] : null;
+}
+
+/**
+ * Ensure directory exists (cross-platform)
+ */
+function ensureDir(dirPath: string): void {
+  try {
+    if (!originalFs.existsSync(dirPath)) {
+      originalFs.mkdirSync(dirPath, { recursive: true });
+    }
+  } catch (error) {
+    // Ignore errors (directory might already exist due to race)
+  }
+}
+
+/**
+ * Safe JSON parse
+ */
+function safeJsonParse(str: string): any | null {
+  try {
+    return JSON.parse(str);
+  } catch {
+    return null;
+  }
+}
+
+// ============================================================================
+// Database Management
+// ============================================================================
+
+/**
+ * Get sql.js WASM locator based on platform
+ */
+function getSqlJsConfig(): any {
+  // sql.js needs to locate its WASM file
+  // Try multiple locations for cross-platform compatibility
+  const possiblePaths = [
+    // npm package location
+    path.join(__dirname, '..', 'node_modules', 'sql.js', 'dist', 'sql-wasm.wasm'),
+    // Project node_modules
+    path.join(process.cwd(), 'node_modules', 'sql.js', 'dist', 'sql-wasm.wasm'),
+    // Global node_modules
+    path.join(os.homedir(), 'node_modules', 'sql.js', 'dist', 'sql-wasm.wasm'),
+  ];
+
+  for (const wasmPath of possiblePaths) {
+    if (originalFs.existsSync(wasmPath)) {
+      return { locateFile: () => wasmPath };
+    }
+  }
+
+  // Let sql.js try to find it itself
+  return {};
 }
 
 /**
@@ -50,72 +179,125 @@ function shouldIntercept(filePath: string): boolean {
  */
 async function initDatabase(): Promise<void> {
   if (initialized) return;
-
-  const SQL = await initSqlJs();
-
-  // Try to load existing database
-  try {
-    const existingData = originalFs.readFileSync(INTERCEPTOR_DB_PATH);
-    db = new SQL.Database(existingData);
-  } catch {
-    db = new SQL.Database();
+  if (sqlJsPromise) {
+    await sqlJsPromise;
+    return;
   }
 
-  // Create schema
-  db.run(`
-    CREATE TABLE IF NOT EXISTS messages (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      session_id TEXT NOT NULL,
-      line_number INTEGER NOT NULL,
-      type TEXT,
-      content TEXT NOT NULL,
-      timestamp TEXT,
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-      -- Optimization: index for fast lookups
-      UNIQUE(session_id, line_number)
-    );
+  sqlJsPromise = (async () => {
+    try {
+      const SQL = await initSqlJs(getSqlJsConfig());
 
-    CREATE INDEX IF NOT EXISTS idx_session ON messages(session_id);
-    CREATE INDEX IF NOT EXISTS idx_type ON messages(type);
-    CREATE INDEX IF NOT EXISTS idx_timestamp ON messages(timestamp);
+      // Try to load existing database
+      try {
+        if (originalFs.existsSync(INTERCEPTOR_DB_PATH)) {
+          const existingData = originalFs.readFileSync(INTERCEPTOR_DB_PATH);
+          db = new SQL.Database(existingData);
+        } else {
+          db = new SQL.Database();
+        }
+      } catch {
+        db = new SQL.Database();
+      }
 
-    -- Compressed summaries for compacted conversations
-    CREATE TABLE IF NOT EXISTS summaries (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      session_id TEXT NOT NULL,
-      summary TEXT NOT NULL,
-      original_size INTEGER,
-      compressed_size INTEGER,
-      patterns_preserved TEXT, -- JSON array of preserved patterns
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP
-    );
+      // Create schema
+      db.run(`
+        -- Messages table (mirrors JSONL content)
+        CREATE TABLE IF NOT EXISTS messages (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          session_id TEXT NOT NULL,
+          line_number INTEGER NOT NULL,
+          type TEXT,
+          content TEXT NOT NULL,
+          timestamp TEXT,
+          created_at TEXT DEFAULT (datetime('now')),
+          UNIQUE(session_id, line_number)
+        );
 
-    -- Pattern cache for quick retrieval
-    CREATE TABLE IF NOT EXISTS patterns (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      pattern_type TEXT NOT NULL,
-      pattern_key TEXT NOT NULL,
-      pattern_value TEXT NOT NULL,
-      confidence REAL DEFAULT 0.5,
-      usage_count INTEGER DEFAULT 0,
-      last_used TEXT,
-      UNIQUE(pattern_type, pattern_key)
-    );
+        CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id);
+        CREATE INDEX IF NOT EXISTS idx_messages_type ON messages(type);
+        CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages(timestamp);
 
-    CREATE INDEX IF NOT EXISTS idx_patterns ON patterns(pattern_type, confidence DESC);
-  `);
+        -- Summaries (compacted conversations)
+        CREATE TABLE IF NOT EXISTS summaries (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          session_id TEXT NOT NULL,
+          summary TEXT NOT NULL,
+          original_size INTEGER,
+          compressed_size INTEGER,
+          patterns_json TEXT,
+          created_at TEXT DEFAULT (datetime('now'))
+        );
 
-  initialized = true;
-  console.error('[CacheInterceptor] Database initialized');
+        CREATE INDEX IF NOT EXISTS idx_summaries_session ON summaries(session_id);
+
+        -- Learned patterns
+        CREATE TABLE IF NOT EXISTS patterns (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          pattern_type TEXT NOT NULL,
+          pattern_key TEXT NOT NULL,
+          pattern_value TEXT NOT NULL,
+          confidence REAL DEFAULT 0.5,
+          usage_count INTEGER DEFAULT 1,
+          last_used TEXT DEFAULT (datetime('now')),
+          UNIQUE(pattern_type, pattern_key)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_patterns_type ON patterns(pattern_type);
+        CREATE INDEX IF NOT EXISTS idx_patterns_confidence ON patterns(confidence DESC);
+
+        -- Session metadata
+        CREATE TABLE IF NOT EXISTS sessions (
+          session_id TEXT PRIMARY KEY,
+          project_path TEXT,
+          first_message TEXT,
+          message_count INTEGER DEFAULT 0,
+          total_size INTEGER DEFAULT 0,
+          created_at TEXT DEFAULT (datetime('now')),
+          last_accessed TEXT DEFAULT (datetime('now'))
+        );
+
+        -- Optimized context cache
+        CREATE TABLE IF NOT EXISTS context_cache (
+          cache_key TEXT PRIMARY KEY,
+          context TEXT NOT NULL,
+          token_estimate INTEGER,
+          created_at TEXT DEFAULT (datetime('now')),
+          expires_at TEXT
+        );
+      `);
+
+      initialized = true;
+      logInfo('Database initialized at ' + INTERCEPTOR_DB_PATH);
+
+    } catch (error) {
+      logError('Failed to initialize database: ' + error);
+      // Continue without interception if DB fails
+    }
+  })();
+
+  await sqlJsPromise;
 }
 
-/**
- * Parse session ID from file path
- */
-function parseSessionId(filePath: string): string | null {
-  const match = filePath.match(/([a-f0-9-]{36})\.jsonl$/);
-  return match ? match[1] : null;
+// ============================================================================
+// Logging (Cross-platform, non-blocking)
+// ============================================================================
+
+const LOG_ENABLED = process.env.CACHE_INTERCEPTOR_DEBUG === 'true';
+
+function logInfo(message: string): void {
+  if (LOG_ENABLED) {
+    process.stderr.write(`[CacheInterceptor] ${message}\n`);
+  }
 }
+
+function logError(message: string): void {
+  process.stderr.write(`[CacheInterceptor ERROR] ${message}\n`);
+}
+
+// ============================================================================
+// File System Interception
+// ============================================================================
 
 /**
  * Intercepted readFileSync
@@ -126,17 +308,18 @@ function interceptedReadFileSync(
 ): string | Buffer {
   const pathStr = filePath.toString();
 
+  // Quick path: don't intercept if not a Claude file
   if (!shouldIntercept(pathStr)) {
     return originalFs.readFileSync(filePath, options as any);
   }
 
   const sessionId = parseSessionId(pathStr);
-  if (!sessionId || !db) {
+  if (!sessionId || !db || !initialized) {
     return originalFs.readFileSync(filePath, options as any);
   }
 
   try {
-    // Read from SQLite instead of file
+    // Read from SQLite
     const stmt = db.prepare('SELECT content FROM messages WHERE session_id = ? ORDER BY line_number');
     stmt.bind([sessionId]);
 
@@ -152,14 +335,17 @@ function interceptedReadFileSync(
     }
 
     const content = lines.join('\n') + '\n';
+    logInfo(`Read ${lines.length} messages for session ${sessionId.slice(0, 8)}...`);
 
-    if (options === 'utf8' || (typeof options === 'object' && options?.encoding === 'utf8')) {
+    // Return in requested format
+    const encoding = typeof options === 'string' ? options : options?.encoding;
+    if (encoding === 'utf8' || encoding === 'utf-8') {
       return content;
     }
-    return Buffer.from(content);
+    return Buffer.from(content, 'utf8');
 
   } catch (error) {
-    // Fall back to original on error
+    logError(`Read error: ${error}`);
     return originalFs.readFileSync(filePath, options as any);
   }
 }
@@ -174,10 +360,11 @@ function interceptedAppendFileSync(
 ): void {
   const pathStr = filePath.toString();
 
-  // Always write to original file for compatibility
+  // Always write to original file first (for compatibility)
   originalFs.appendFileSync(filePath, data, options);
 
-  if (!shouldIntercept(pathStr) || !db) {
+  // Quick path: don't intercept if not a Claude file
+  if (!shouldIntercept(pathStr) || !db || !initialized) {
     return;
   }
 
@@ -188,114 +375,157 @@ function interceptedAppendFileSync(
     const content = data.toString();
     const lines = content.split('\n').filter(line => line.trim());
 
+    if (lines.length === 0) return;
+
     // Get current max line number
-    const maxLine = db.exec(`SELECT MAX(line_number) FROM messages WHERE session_id = ?`, [sessionId]);
-    let lineNumber = (maxLine[0]?.values[0]?.[0] as number) || 0;
+    const result = db.exec(
+      'SELECT COALESCE(MAX(line_number), 0) FROM messages WHERE session_id = ?',
+      [sessionId]
+    );
+    let lineNumber = (result[0]?.values[0]?.[0] as number) || 0;
+
+    // Batch insert for performance
+    const insertStmt = db.prepare(
+      'INSERT OR REPLACE INTO messages (session_id, line_number, type, content, timestamp) VALUES (?, ?, ?, ?, ?)'
+    );
 
     for (const line of lines) {
       lineNumber++;
 
-      // Parse message type and timestamp
-      let type = 'unknown';
-      let timestamp = null;
-      try {
-        const parsed = JSON.parse(line);
-        type = parsed.type || 'unknown';
-        timestamp = parsed.timestamp || null;
-      } catch {}
+      // Parse message
+      const parsed = safeJsonParse(line);
+      const type = parsed?.type || 'unknown';
+      const timestamp = parsed?.timestamp || null;
 
-      db.run(
-        `INSERT OR REPLACE INTO messages (session_id, line_number, type, content, timestamp) VALUES (?, ?, ?, ?, ?)`,
-        [sessionId, lineNumber, type, line, timestamp]
-      );
+      insertStmt.run([sessionId, lineNumber, type, line, timestamp]);
 
-      // Extract and cache patterns from summaries
-      if (type === 'summary') {
-        try {
-          const parsed = JSON.parse(line);
-          if (parsed.summary) {
-            db.run(
-              `INSERT INTO summaries (session_id, summary, original_size) VALUES (?, ?, ?)`,
-              [sessionId, parsed.summary, content.length]
-            );
-          }
-        } catch {}
+      // Extract summaries for pattern learning
+      if (type === 'summary' && parsed?.summary) {
+        db.run(
+          'INSERT INTO summaries (session_id, summary, original_size) VALUES (?, ?, ?)',
+          [sessionId, parsed.summary, line.length]
+        );
       }
     }
 
-    // Persist database periodically
-    persistDatabase();
+    insertStmt.free();
+
+    // Update session metadata
+    db.run(`
+      INSERT INTO sessions (session_id, message_count, last_accessed)
+      VALUES (?, ?, datetime('now'))
+      ON CONFLICT(session_id) DO UPDATE SET
+        message_count = message_count + ?,
+        last_accessed = datetime('now')
+    `, [sessionId, lines.length, lines.length]);
+
+    logInfo(`Stored ${lines.length} messages for session ${sessionId.slice(0, 8)}...`);
+
+    // Schedule database persistence
+    schedulePersist();
 
   } catch (error) {
-    console.error('[CacheInterceptor] Error storing message:', error);
+    logError(`Write error: ${error}`);
   }
 }
 
-/**
- * Persist database to disk
- */
-let persistTimeout: NodeJS.Timeout | null = null;
-function persistDatabase(): void {
-  if (persistTimeout) return;
+// ============================================================================
+// Database Persistence
+// ============================================================================
 
-  persistTimeout = setTimeout(() => {
-    if (db) {
-      try {
-        const data = db.export();
-        const dir = path.dirname(INTERCEPTOR_DB_PATH);
-        if (!originalFs.existsSync(dir)) {
-          fs.mkdirSync(dir, { recursive: true });
-        }
-        originalFs.writeFileSync(INTERCEPTOR_DB_PATH, Buffer.from(data));
-      } catch (error) {
-        console.error('[CacheInterceptor] Error persisting database:', error);
-      }
-    }
-    persistTimeout = null;
-  }, 1000);
+let persistTimer: ReturnType<typeof setTimeout> | null = null;
+const PERSIST_DELAY_MS = 2000; // Batch writes for efficiency
+
+function schedulePersist(): void {
+  if (persistTimer) return;
+
+  persistTimer = setTimeout(() => {
+    persistTimer = null;
+    persistDatabase();
+  }, PERSIST_DELAY_MS);
 }
 
-/**
- * Query API for external access
- */
+function persistDatabase(): void {
+  if (!db) return;
+
+  try {
+    const data = db.export();
+    const dir = path.dirname(INTERCEPTOR_DB_PATH);
+    ensureDir(dir);
+
+    // Atomic write (write to temp, then rename)
+    const tempPath = INTERCEPTOR_DB_PATH + '.tmp';
+    originalFs.writeFileSync(tempPath, Buffer.from(data));
+    fs.renameSync(tempPath, INTERCEPTOR_DB_PATH);
+
+    logInfo('Database persisted');
+  } catch (error) {
+    logError(`Persist error: ${error}`);
+  }
+}
+
+// ============================================================================
+// Query API (for external tools)
+// ============================================================================
+
 export const CacheQuery = {
   /**
    * Get all messages for a session
    */
   getSession(sessionId: string): any[] {
     if (!db) return [];
-    const stmt = db.prepare('SELECT content FROM messages WHERE session_id = ? ORDER BY line_number');
-    stmt.bind([sessionId]);
-    const results: any[] = [];
-    while (stmt.step()) {
-      try {
-        results.push(JSON.parse(stmt.get()[0] as string));
-      } catch {}
+    try {
+      const stmt = db.prepare('SELECT content FROM messages WHERE session_id = ? ORDER BY line_number');
+      stmt.bind([sessionId]);
+      const results: any[] = [];
+      while (stmt.step()) {
+        const parsed = safeJsonParse(stmt.get()[0] as string);
+        if (parsed) results.push(parsed);
+      }
+      stmt.free();
+      return results;
+    } catch {
+      return [];
     }
-    stmt.free();
-    return results;
   },
 
   /**
-   * Get all summaries (compacted content)
+   * Get messages by type
    */
-  getSummaries(sessionId?: string): any[] {
+  getMessagesByType(sessionId: string, type: string): any[] {
     if (!db) return [];
-    const query = sessionId
-      ? 'SELECT * FROM summaries WHERE session_id = ? ORDER BY created_at DESC'
-      : 'SELECT * FROM summaries ORDER BY created_at DESC';
-    return db.exec(query, sessionId ? [sessionId] : [])[0]?.values || [];
+    try {
+      const stmt = db.prepare(
+        'SELECT content FROM messages WHERE session_id = ? AND type = ? ORDER BY line_number'
+      );
+      stmt.bind([sessionId, type]);
+      const results: any[] = [];
+      while (stmt.step()) {
+        const parsed = safeJsonParse(stmt.get()[0] as string);
+        if (parsed) results.push(parsed);
+      }
+      stmt.free();
+      return results;
+    } catch {
+      return [];
+    }
   },
 
   /**
-   * Get cached patterns
+   * Get all summaries
    */
-  getPatterns(type?: string, minConfidence = 0.5): any[] {
+  getAllSummaries(): Array<{ session_id: string; summary: string; created_at: string }> {
     if (!db) return [];
-    const query = type
-      ? 'SELECT * FROM patterns WHERE pattern_type = ? AND confidence >= ? ORDER BY confidence DESC'
-      : 'SELECT * FROM patterns WHERE confidence >= ? ORDER BY confidence DESC';
-    return db.exec(query, type ? [type, minConfidence] : [minConfidence])[0]?.values || [];
+    try {
+      const result = db.exec('SELECT session_id, summary, created_at FROM summaries ORDER BY created_at DESC');
+      return (result[0]?.values || []).map(row => ({
+        session_id: row[0] as string,
+        summary: row[1] as string,
+        created_at: row[2] as string,
+      }));
+    } catch {
+      return [];
+    }
   },
 
   /**
@@ -303,60 +533,138 @@ export const CacheQuery = {
    */
   storePattern(type: string, key: string, value: string, confidence = 0.5): void {
     if (!db) return;
-    db.run(
-      `INSERT OR REPLACE INTO patterns (pattern_type, pattern_key, pattern_value, confidence, usage_count, last_used)
-       VALUES (?, ?, ?, ?, COALESCE((SELECT usage_count + 1 FROM patterns WHERE pattern_type = ? AND pattern_key = ?), 1), datetime('now'))`,
-      [type, key, value, confidence, type, key]
-    );
-    persistDatabase();
+    try {
+      db.run(`
+        INSERT INTO patterns (pattern_type, pattern_key, pattern_value, confidence)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(pattern_type, pattern_key) DO UPDATE SET
+          pattern_value = excluded.pattern_value,
+          confidence = MAX(confidence, excluded.confidence),
+          usage_count = usage_count + 1,
+          last_used = datetime('now')
+      `, [type, key, value, confidence]);
+      schedulePersist();
+    } catch {}
+  },
+
+  /**
+   * Get learned patterns
+   */
+  getPatterns(type?: string, minConfidence = 0.5): Array<{ type: string; key: string; value: string; confidence: number }> {
+    if (!db) return [];
+    try {
+      const query = type
+        ? 'SELECT pattern_type, pattern_key, pattern_value, confidence FROM patterns WHERE pattern_type = ? AND confidence >= ? ORDER BY confidence DESC'
+        : 'SELECT pattern_type, pattern_key, pattern_value, confidence FROM patterns WHERE confidence >= ? ORDER BY confidence DESC';
+      const result = db.exec(query, type ? [type, minConfidence] : [minConfidence]);
+      return (result[0]?.values || []).map(row => ({
+        type: row[0] as string,
+        key: row[1] as string,
+        value: row[2] as string,
+        confidence: row[3] as number,
+      }));
+    } catch {
+      return [];
+    }
   },
 
   /**
    * Get optimized context for injection
    */
-  getOptimizedContext(maxTokens = 4000): string {
+  getOptimizedContext(maxChars = 16000): string {
     if (!db) return '';
 
-    // Get high-confidence patterns
-    const patterns = db.exec(
-      'SELECT pattern_type, pattern_key, pattern_value FROM patterns WHERE confidence >= 0.7 ORDER BY confidence DESC LIMIT 20'
-    )[0]?.values || [];
+    try {
+      // Get high-confidence patterns
+      const patterns = this.getPatterns(undefined, 0.7).slice(0, 20);
 
-    // Get recent summaries
-    const summaries = db.exec(
-      'SELECT summary FROM summaries ORDER BY created_at DESC LIMIT 5'
-    )[0]?.values || [];
+      // Get recent summaries
+      const summaries = this.getAllSummaries().slice(0, 5);
 
-    let context = '## Learned Patterns\n';
-    for (const [type, key, value] of patterns) {
-      context += `- ${type}: ${key} → ${value}\n`;
+      let context = '## Learned Patterns\n';
+      for (const p of patterns) {
+        context += `- [${p.type}] ${p.key}: ${p.value}\n`;
+      }
+
+      context += '\n## Recent Context Summaries\n';
+      for (const s of summaries) {
+        context += `${s.summary}\n---\n`;
+      }
+
+      return context.slice(0, maxChars);
+    } catch {
+      return '';
     }
+  },
 
-    context += '\n## Recent Context\n';
-    for (const [summary] of summaries) {
-      context += `${summary}\n\n`;
+  /**
+   * Get database stats
+   */
+  getStats(): { messages: number; summaries: number; patterns: number; sessions: number } {
+    if (!db) return { messages: 0, summaries: 0, patterns: 0, sessions: 0 };
+    try {
+      const messages = db.exec('SELECT COUNT(*) FROM messages')[0]?.values[0]?.[0] as number || 0;
+      const summaries = db.exec('SELECT COUNT(*) FROM summaries')[0]?.values[0]?.[0] as number || 0;
+      const patterns = db.exec('SELECT COUNT(*) FROM patterns')[0]?.values[0]?.[0] as number || 0;
+      const sessions = db.exec('SELECT COUNT(DISTINCT session_id) FROM messages')[0]?.values[0]?.[0] as number || 0;
+      return { messages, summaries, patterns, sessions };
+    } catch {
+      return { messages: 0, summaries: 0, patterns: 0, sessions: 0 };
     }
-
-    return context.slice(0, maxTokens * 4); // Rough char-to-token ratio
-  }
+  },
 };
 
+// ============================================================================
+// Installation
+// ============================================================================
+
 /**
- * Install the interceptor
+ * Install the interceptor (patches fs module)
  */
 export async function install(): Promise<void> {
   await initDatabase();
+
+  if (!initialized || !db) {
+    logError('Database not initialized, skipping interception');
+    return;
+  }
 
   // Patch fs module
   (fs as any).readFileSync = interceptedReadFileSync;
   (fs as any).appendFileSync = interceptedAppendFileSync;
 
-  console.error('[CacheInterceptor] ✓ Installed - intercepting Claude Code cache operations');
+  // Handle process exit
+  process.on('exit', () => {
+    if (persistTimer) {
+      clearTimeout(persistTimer);
+      persistDatabase();
+    }
+  });
+
+  process.on('SIGINT', () => {
+    persistDatabase();
+    process.exit(0);
+  });
+
+  process.on('SIGTERM', () => {
+    persistDatabase();
+    process.exit(0);
+  });
+
+  logInfo('✓ Installed - intercepting Claude Code cache operations');
+  logInfo(`  Platform: ${os.platform()}`);
+  logInfo(`  Claude dir: ${CLAUDE_DIR}`);
+  logInfo(`  DB path: ${INTERCEPTOR_DB_PATH}`);
 }
 
 /**
  * Auto-install if loaded via --require
  */
 if (require.main !== module) {
-  install().catch(console.error);
+  install().catch(err => {
+    logError(`Install failed: ${err}`);
+  });
 }
+
+// Export for direct usage
+export { initDatabase, persistDatabase, INTERCEPTOR_DB_PATH, CLAUDE_DIR };
