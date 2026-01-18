@@ -148,11 +148,21 @@ export class RateLimiter extends EventEmitter {
    */
   check(): RateLimitStatus {
     this.cleanup();
+    const now = Date.now();
+    const allowed = this.requests.length < this.config.maxRequests;
+
+    // Calculate retryAfter if not allowed
+    let retryAfter: number | undefined;
+    if (!allowed && this.requests.length > 0) {
+      const oldestRequest = this.requests[0];
+      retryAfter = Math.max(0, oldestRequest + this.config.windowMs - now);
+    }
 
     return {
-      allowed: this.requests.length < this.config.maxRequests,
+      allowed,
       remaining: Math.max(0, this.config.maxRequests - this.requests.length),
       resetAt: this.getResetTime(),
+      retryAfter,
       tokensRemaining: this.config.maxTokensPerMinute ? this.config.maxTokensPerMinute - this.tokens : undefined,
     };
   }
