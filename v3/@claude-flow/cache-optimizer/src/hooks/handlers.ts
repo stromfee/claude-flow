@@ -295,3 +295,287 @@ export function getGlobalOptimizer(config?: Partial<CacheOptimizerConfig>): Cach
 export function resetGlobalOptimizer(): void {
   globalOptimizer = null;
 }
+
+// =============================================================================
+// HANDOFF HOOK HANDLERS
+// =============================================================================
+
+import { HandoffManager, type HandoffRequest, type HandoffResponse } from '../handoff/index.js';
+import { BackgroundHandler, createHandoffChain } from '../handoff/background-handler.js';
+import type { HandoffConfig } from '../types.js';
+
+/**
+ * Singleton handoff manager instance
+ */
+let globalHandoffManager: HandoffManager | null = null;
+
+export function getGlobalHandoffManager(config?: Partial<HandoffConfig>): HandoffManager {
+  if (!globalHandoffManager) {
+    globalHandoffManager = new HandoffManager(config);
+  }
+  return globalHandoffManager;
+}
+
+export function resetGlobalHandoffManager(): void {
+  if (globalHandoffManager) {
+    globalHandoffManager.shutdown();
+    globalHandoffManager = null;
+  }
+}
+
+/**
+ * Hook handler for initiating a model handoff
+ *
+ * Requests another model (local Ollama or remote API) and returns the response.
+ * Supports background processing for non-blocking operations.
+ */
+export async function handleHandoffRequest(
+  prompt: string,
+  options: {
+    systemPrompt?: string;
+    provider?: string;
+    sessionId?: string;
+    callbackInstructions?: string;
+    background?: boolean;
+    temperature?: number;
+    maxTokens?: number;
+  } = {}
+): Promise<HookResult & { handoffResponse?: HandoffResponse; handoffId?: string }> {
+  const startTime = Date.now();
+  const actions: HookAction[] = [];
+
+  const manager = getGlobalHandoffManager();
+
+  const request = manager.createRequest({
+    prompt,
+    systemPrompt: options.systemPrompt,
+    provider: options.provider,
+    sessionId: options.sessionId,
+    callbackInstructions: options.callbackInstructions,
+    temperature: options.temperature,
+    maxTokens: options.maxTokens,
+    background: options.background,
+  });
+
+  if (options.background) {
+    // Background mode: start and return immediately
+    const handoffId = await manager.sendBackground(request);
+
+    actions.push({
+      type: 'score_update',
+      details: `Started background handoff to ${options.provider || 'auto'} (ID: ${handoffId})`,
+    });
+
+    return {
+      success: true,
+      actions,
+      durationMs: Date.now() - startTime,
+      compactionPrevented: false,
+      tokensFreed: 0,
+      newUtilization: 0,
+      handoffId,
+    };
+  }
+
+  // Synchronous mode: wait for response
+  const response = await manager.send(request);
+
+  actions.push({
+    type: 'score_update',
+    details: `Completed handoff to ${response.provider} (${response.durationMs}ms, ${response.tokens.total} tokens)`,
+  });
+
+  return {
+    success: response.status === 'completed',
+    actions,
+    durationMs: Date.now() - startTime,
+    compactionPrevented: false,
+    tokensFreed: 0,
+    newUtilization: 0,
+    handoffResponse: response,
+    error: response.error,
+  };
+}
+
+/**
+ * Hook handler for polling a background handoff
+ */
+export async function handleHandoffPoll(
+  handoffId: string,
+  timeout: number = 30000
+): Promise<HookResult & { handoffResponse?: HandoffResponse }> {
+  const startTime = Date.now();
+
+  const manager = getGlobalHandoffManager();
+  const response = await manager.getResponse(handoffId, timeout);
+
+  if (!response) {
+    return {
+      success: false,
+      actions: [{
+        type: 'score_update',
+        details: `Handoff ${handoffId} not found or timed out`,
+      }],
+      durationMs: Date.now() - startTime,
+      compactionPrevented: false,
+      tokensFreed: 0,
+      newUtilization: 0,
+      error: 'Handoff not found or timed out',
+    };
+  }
+
+  return {
+    success: response.status === 'completed',
+    actions: [{
+      type: 'score_update',
+      details: `Retrieved handoff response (${response.status})`,
+    }],
+    durationMs: Date.now() - startTime,
+    compactionPrevented: false,
+    tokensFreed: 0,
+    newUtilization: 0,
+    handoffResponse: response,
+    error: response.error,
+  };
+}
+
+/**
+ * Hook handler for cancelling a background handoff
+ */
+export async function handleHandoffCancel(
+  handoffId: string
+): Promise<HookResult> {
+  const startTime = Date.now();
+
+  const manager = getGlobalHandoffManager();
+  const cancelled = manager.cancel(handoffId);
+
+  return {
+    success: cancelled,
+    actions: [{
+      type: 'score_update',
+      details: cancelled
+        ? `Cancelled handoff ${handoffId}`
+        : `Failed to cancel handoff ${handoffId}`,
+    }],
+    durationMs: Date.now() - startTime,
+    compactionPrevented: false,
+    tokensFreed: 0,
+    newUtilization: 0,
+    error: cancelled ? undefined : 'Handoff not found or already completed',
+  };
+}
+
+/**
+ * Hook handler for getting handoff metrics
+ */
+export function getHandoffMetrics(): {
+  totalRequests: number;
+  successfulRequests: number;
+  failedRequests: number;
+  averageLatency: number;
+  totalTokens: number;
+  byProvider: Record<string, number>;
+  queueLength: number;
+  activeRequests: number;
+} {
+  const manager = getGlobalHandoffManager();
+  return manager.getMetrics();
+}
+
+/**
+ * Hook handler for health checking all providers
+ */
+export async function handleHandoffHealthCheck(): Promise<Record<string, boolean>> {
+  const manager = getGlobalHandoffManager();
+  return manager.healthCheckAll();
+}
+
+/**
+ * Chain handoffs together for multi-step workflows
+ *
+ * Example:
+ * ```typescript
+ * const chain = createHandoffWorkflow();
+ * const result = await chain
+ *   .step('Analyze this code', { systemPrompt: 'You are a code analyst' })
+ *   .step('Suggest improvements', { context: 'previous' })
+ *   .step('Generate tests', { context: 'previous' })
+ *   .execute();
+ * ```
+ */
+export function createHandoffWorkflow() {
+  const steps: Array<{
+    prompt: string;
+    options: {
+      systemPrompt?: string;
+      provider?: string;
+      context?: 'previous' | 'all' | undefined;
+    };
+  }> = [];
+
+  return {
+    step(prompt: string, options: {
+      systemPrompt?: string;
+      provider?: string;
+      context?: 'previous' | 'all';
+    } = {}) {
+      steps.push({ prompt, options });
+      return this;
+    },
+
+    async execute(): Promise<{
+      responses: HandoffResponse[];
+      totalDuration: number;
+      totalTokens: number;
+    }> {
+      const startTime = Date.now();
+      const responses: HandoffResponse[] = [];
+      const manager = getGlobalHandoffManager();
+
+      for (let i = 0; i < steps.length; i++) {
+        const step = steps[i];
+        let contextMessages: Array<{ role: 'user' | 'assistant'; content: string }> = [];
+
+        // Build context from previous responses
+        if (step.options.context === 'previous' && responses.length > 0) {
+          const prev = responses[responses.length - 1];
+          contextMessages = [
+            { role: 'user', content: steps[i - 1].prompt },
+            { role: 'assistant', content: prev.content },
+          ];
+        } else if (step.options.context === 'all') {
+          for (let j = 0; j < responses.length; j++) {
+            contextMessages.push(
+              { role: 'user', content: steps[j].prompt },
+              { role: 'assistant', content: responses[j].content }
+            );
+          }
+        }
+
+        const request = manager.createRequest({
+          prompt: step.prompt,
+          systemPrompt: step.options.systemPrompt,
+          provider: step.options.provider,
+          context: contextMessages,
+        });
+
+        const response = await manager.send(request);
+        responses.push(response);
+
+        // Stop chain on failure
+        if (response.status !== 'completed') {
+          break;
+        }
+      }
+
+      const totalTokens = responses.reduce((sum, r) => sum + r.tokens.total, 0);
+
+      return {
+        responses,
+        totalDuration: Date.now() - startTime,
+        totalTokens,
+      };
+    },
+  };
+}
