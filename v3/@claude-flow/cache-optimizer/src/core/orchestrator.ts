@@ -149,6 +149,41 @@ export class CacheOptimizer {
     this.tokenCounter.addEntry(entry);
     this.updateAccessOrder(id);
 
+    // Embed in hyperbolic space for drift detection
+    if (this.useHyperbolic) {
+      this.hyperbolicIntelligence.embedEntry(entry);
+
+      // Add hyperedges for relationships
+      if (metadata.filePath) {
+        const relatedEntries = Array.from(this.entries.values())
+          .filter(e => e.metadata?.filePath === metadata.filePath && e.id !== id)
+          .slice(-5) // Last 5 related entries
+          .map(e => e.id);
+
+        if (relatedEntries.length > 0) {
+          this.hyperbolicIntelligence.addRelationship(
+            [id, ...relatedEntries],
+            'file_group',
+            { files: [metadata.filePath], timestamp: now }
+          );
+        }
+      }
+
+      // Session context hyperedge
+      const sessionEntries = Array.from(this.entries.values())
+        .filter(e => e.metadata?.sessionId === metadata.sessionId && e.id !== id)
+        .slice(-10)
+        .map(e => e.id);
+
+      if (sessionEntries.length > 0) {
+        this.hyperbolicIntelligence.addRelationship(
+          [id, ...sessionEntries],
+          'session_context',
+          { session: metadata.sessionId, timestamp: now }
+        );
+      }
+    }
+
     return id;
   }
 
