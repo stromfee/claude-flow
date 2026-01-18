@@ -579,8 +579,7 @@ export class FastGRNN {
     ).fill(0);
 
     for (const event of events) {
-      const features = extractEventFeatures(event);
-      const _input = this.padFeatures(features, this.config.inputDim);
+      extractEventFeatures(event); // Prepare features (side effect)
 
       // Compute gradient magnitude
       const finalHidden = this.state.hidden[this.config.numLayers - 1];
