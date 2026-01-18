@@ -400,6 +400,180 @@ const drift = intelligence.analyzeDrift(entries);
 const decision = intelligence.getOptimalPruningDecision(entries, targetUtilization);
 ```
 
+## Multi-Instance Safety (v3.0.0-alpha.2)
+
+The cache optimizer now supports multiple Claude instances running concurrently without memory conflicts.
+
+### 6.1 Session-Partitioned Storage
+
+Each Claude instance/agent operates in isolated storage:
+
+```typescript
+const optimizer = new CacheOptimizer({
+  contextWindowSize: 200000,
+}, {
+  sessionIsolation: true,  // Enable per-session isolation
+});
+
+// Entries are partitioned by sessionId in metadata
+await optimizer.add(content, 'file_read', {
+  sessionId: 'agent-1',  // Isolated from other sessions
+});
+```
+
+**Architecture:**
+```
+CacheOptimizer (singleton per process)
+├── Session Storage Map
+│   ├── session-1: { entries, accessOrder, tokenCounter }
+│   ├── session-2: { entries, accessOrder, tokenCounter }
+│   └── session-N: ...
+└── AsyncMutex (prevents race conditions)
+```
+
+### 6.2 Concurrent Access Protection
+
+All storage operations are protected by an async mutex:
+
+```typescript
+class AsyncMutex {
+  private locked = false;
+  private waitQueue: Array<() => void> = [];
+
+  async acquire(): Promise<() => void> {
+    // Returns release function when lock is acquired
+  }
+}
+
+// Usage in CacheOptimizer
+const release = await this.mutex.acquire();
+try {
+  // Protected operations
+  storage.entries.set(entry.id, entry);
+} finally {
+  release();
+}
+```
+
+### 6.3 Multi-Process File Locking
+
+PersistentStore uses file locking for multi-process safety:
+
+```typescript
+class FileLock {
+  async acquire(): Promise<boolean> {
+    // Creates .lock file with PID:timestamp
+    // Detects stale locks (>30s) and removes them
+    // Times out after 5 seconds
+  }
+
+  async release(): Promise<void> {
+    // Removes .lock file
+  }
+}
+```
+
+**Atomic Writes:**
+```typescript
+// Write to temp file, then atomic rename
+const tempPath = `${path}.tmp.${process.pid}`;
+await writeFile(tempPath, data);
+await rename(tempPath, path);  // Atomic on POSIX
+```
+
+## Security Hardening (v3.0.0-alpha.2)
+
+The handoff system includes comprehensive security measures to prevent common vulnerabilities.
+
+### 7.1 SSRF Prevention (CVE Mitigation)
+
+Custom endpoints are validated to prevent Server-Side Request Forgery:
+
+```typescript
+function validateEndpointUrl(url: string, allowLocal: boolean = false): ValidationResult {
+  // Blocked endpoints:
+  // - Cloud metadata (169.254.169.254, metadata.google.internal)
+  // - Private networks (10.x, 172.16.x, 192.168.x)
+  // - Localhost (unless explicitly allowed)
+  // - Non-HTTP protocols
+}
+
+// Usage
+const validation = validateEndpointUrl(config.endpoint);
+if (!validation.valid) {
+  return { status: 'failed', error: validation.error };
+}
+```
+
+### 7.2 Command Injection Prevention
+
+Background process spawning uses safe script files instead of inline code:
+
+```typescript
+// BEFORE (vulnerable):
+spawn('node', ['-e', `fs.readFileSync('${requestFile}')`]);  // INJECTION RISK!
+
+// AFTER (safe):
+const scriptFile = 'worker.mjs';  // Static content
+await writeFile(scriptFile, workerScript);
+spawn('node', [scriptFile, requestFile]);  // Path passed as argument
+```
+
+**Safe Worker Script:**
+- Reads file path from `process.argv[2]` (no string interpolation)
+- Runs with minimal environment variables
+- Includes request timeout (30s)
+
+### 7.3 Path Traversal Prevention
+
+Request IDs are validated before file operations:
+
+```typescript
+function validateRequestId(id: string): ValidationResult {
+  // Only allow: a-z, A-Z, 0-9, -, _
+  // Max length: 128 characters
+  const sanitized = id.replace(/[^a-zA-Z0-9\-_]/g, '');
+  return { valid: sanitized === id, sanitized };
+}
+```
+
+### 7.4 Header Injection Prevention
+
+Custom headers are validated per RFC 7230:
+
+```typescript
+function validateHeaderName(name: string): boolean {
+  return /^[a-zA-Z0-9\-_]+$/.test(name);
+}
+
+function validateHeaderValue(value: string): boolean {
+  return !/[\r\n\0]/.test(value);  // No CRLF or null bytes
+}
+```
+
+### 7.5 Environment Isolation
+
+Background processes run with minimal environment:
+
+```typescript
+spawn('node', [scriptFile, requestFile], {
+  env: {
+    PATH: process.env.PATH,
+    NODE_ENV: 'production',
+  },
+});
+```
+
+### Security Summary
+
+| Vulnerability | Mitigation | Status |
+|---------------|------------|--------|
+| SSRF via custom endpoint | URL validation, blocked hosts | ✅ Fixed |
+| Command injection | Script file approach | ✅ Fixed |
+| Path traversal | Request ID validation | ✅ Fixed |
+| Header injection | RFC 7230 validation | ✅ Fixed |
+| Env variable leakage | Minimal spawn env | ✅ Fixed |
+
 ## Consequences
 
 ### Positive
@@ -408,16 +582,22 @@ const decision = intelligence.getOptimalPruningDecision(entries, targetUtilizati
 - 22% faster pruning with hyperbolic intelligence
 - Semantic-aware context preservation
 - Historical pattern learning improves over time
+- **Multi-instance safe**: Concurrent agents don't conflict
+- **Security hardened**: CVE-level vulnerabilities addressed
 
 ### Negative
 - Additional memory overhead for embeddings (~8KB per entry)
 - Complexity in compression strategy selection
 - Drift detection requires sufficient historical data
+- **Slight overhead from mutex acquisition** (~0.1ms per operation)
+- **File locking may delay writes** under high contention
 
 ### Mitigations
 - Embeddings stored efficiently with Float32Array
 - Automatic strategy selection based on entry type
 - Graceful degradation when no historical patterns available
+- **Mutex uses queue-based fair scheduling** (no starvation)
+- **Stale lock detection** prevents deadlocks (30s timeout)
 
 ## Related
 
