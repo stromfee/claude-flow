@@ -227,24 +227,41 @@ export class PersistentStore {
   }
 
   /**
-   * Save data to disk
+   * Save data to disk with file locking and atomic writes
+   * Uses temp file + rename for crash safety
    */
   private async saveToDisk(): Promise<void> {
     const queuePath = this.config.dbPath.replace('.db', '_queue.json');
     const metricsPath = this.config.dbPath.replace('.db', '_metrics.json');
 
+    // Acquire file lock
+    const locked = await this.fileLock.acquire();
+
     try {
       const queueRecords = Array.from(this.queueCache.values());
-      await writeFile(queuePath, JSON.stringify(queueRecords, null, 2));
 
-      await writeFile(metricsPath, JSON.stringify({
+      // Atomic write: write to temp file, then rename
+      const queueTempPath = `${queuePath}.tmp.${process.pid}`;
+      const metricsTempPath = `${metricsPath}.tmp.${process.pid}`;
+
+      await writeFile(queueTempPath, JSON.stringify(queueRecords, null, 2));
+      await writeFile(metricsTempPath, JSON.stringify({
         history: this.metricsCache,
         current: this.currentMetrics,
       }, null, 2));
 
+      // Atomic rename
+      await rename(queueTempPath, queuePath);
+      await rename(metricsTempPath, metricsPath);
+
       this.dirty = false;
     } catch (error) {
       console.error('Failed to save to disk:', error);
+    } finally {
+      // Always release lock
+      if (locked) {
+        await this.fileLock.release();
+      }
     }
   }
 
