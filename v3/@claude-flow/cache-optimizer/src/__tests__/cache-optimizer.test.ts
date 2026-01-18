@@ -330,9 +330,9 @@ describe('CacheOptimizer', () => {
   });
 
   it('should prune low relevance entries when threshold exceeded', async () => {
-    // Add entries to exceed threshold
+    // Add entries to exceed threshold (10000 token window, need > 6000 tokens = ~24000 chars)
     for (let i = 0; i < 10; i++) {
-      await optimizer.add('x'.repeat(800), 'bash_output', { sessionId: 'test' });
+      await optimizer.add('x'.repeat(3000), 'bash_output', { sessionId: 'test' });
     }
 
     const utilizationBefore = optimizer.getUtilization();
