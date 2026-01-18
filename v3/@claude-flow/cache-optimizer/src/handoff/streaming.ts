@@ -513,7 +513,7 @@ export class StreamingHandler extends EventEmitter {
    * Cancel all streams
    */
   cancelAll(): void {
-    for (const [id, controller] of this.activeStreams) {
+    for (const controller of this.activeStreams.values()) {
       controller.abort();
     }
     this.activeStreams.clear();
