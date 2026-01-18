@@ -693,6 +693,102 @@ export class AdvancedOptimizer {
   }
 
   /**
+   * Build mappings of tool_use -> tool_result pairs
+   *
+   * Returns a Map where:
+   * - Key: index of message containing tool_use
+   * - Value: index of message containing corresponding tool_result
+   *
+   * Also returns reverse mapping and set of indices that are part of pairs.
+   */
+  private buildToolUsePairs(messages: ParsedMessage[]): {
+    toolUseToResult: Map<number, number>;
+    resultToToolUse: Map<number, number>;
+    pairedIndices: Set<number>;
+  } {
+    const toolUseToResult = new Map<number, number>();
+    const resultToToolUse = new Map<number, number>();
+    const pairedIndices = new Set<number>();
+
+    // Extract tool_use_ids from assistant messages
+    const toolUseIdToIndex = new Map<string, number>();
+
+    for (let i = 0; i < messages.length; i++) {
+      const msg = messages[i];
+      const parsed = msg.parsed as Record<string, unknown>;
+
+      // Check for assistant messages with tool_use in content
+      if (parsed.message && typeof parsed.message === 'object') {
+        const message = parsed.message as { role?: string; content?: unknown };
+        if (message.role === 'assistant' && Array.isArray(message.content)) {
+          for (const block of message.content) {
+            if (block && typeof block === 'object' && 'type' in block && block.type === 'tool_use') {
+              const toolUseBlock = block as { id?: string };
+              if (toolUseBlock.id) {
+                toolUseIdToIndex.set(toolUseBlock.id, i);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Find corresponding tool_result messages
+    for (let i = 0; i < messages.length; i++) {
+      const msg = messages[i];
+      const parsed = msg.parsed as Record<string, unknown>;
+
+      // Check for user messages with tool_result in content
+      if (parsed.message && typeof parsed.message === 'object') {
+        const message = parsed.message as { role?: string; content?: unknown };
+        if (message.role === 'user' && Array.isArray(message.content)) {
+          for (const block of message.content) {
+            if (block && typeof block === 'object' && 'type' in block && block.type === 'tool_result') {
+              const toolResultBlock = block as { tool_use_id?: string };
+              if (toolResultBlock.tool_use_id) {
+                const toolUseIndex = toolUseIdToIndex.get(toolResultBlock.tool_use_id);
+                if (toolUseIndex !== undefined) {
+                  toolUseToResult.set(toolUseIndex, i);
+                  resultToToolUse.set(i, toolUseIndex);
+                  pairedIndices.add(toolUseIndex);
+                  pairedIndices.add(i);
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // Also check for toolUseResult field (Claude Code format)
+      if (parsed.toolUseResult) {
+        // Find the preceding assistant message that should have the tool_use
+        for (let j = i - 1; j >= 0; j--) {
+          const prevMsg = messages[j].parsed as Record<string, unknown>;
+          if (prevMsg.message && typeof prevMsg.message === 'object') {
+            const prevMessage = prevMsg.message as { role?: string };
+            if (prevMessage.role === 'assistant') {
+              toolUseToResult.set(j, i);
+              resultToToolUse.set(i, j);
+              pairedIndices.add(j);
+              pairedIndices.add(i);
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    return { toolUseToResult, resultToToolUse, pairedIndices };
+  }
+
+  /**
+   * Check if a message can be independently removed (not part of a tool pair)
+   */
+  private canRemoveIndependently(index: number, pairedIndices: Set<number>): boolean {
+    return !pairedIndices.has(index);
+  }
+
+  /**
    * Get configuration
    */
   getConfig(): AdvancedOptimizerConfig {
