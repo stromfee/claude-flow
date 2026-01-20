@@ -3193,6 +3193,79 @@ await hooks.endTrajectory(trajectory, { success: true });
 | `@claude-flow/neural` | SONA learning | `SONAAdapter`, `MoERouter` |
 | `@claude-flow/providers` | LLM providers | `ProviderRegistry`, `createProvider` |
 | `@claude-flow/plugins` | Plugin SDK | `PluginBuilder`, `createPlugin` |
+| `@claude-flow/browser` | Browser automation | `createBrowserService`, `browserTools` |
+
+</details>
+
+---
+
+<details>
+<summary><strong>🌐 Browser Automation — @claude-flow/browser</strong></summary>
+
+[![npm version](https://img.shields.io/npm/v/@claude-flow/browser?color=blue&label=npm)](https://www.npmjs.com/package/@claude-flow/browser)
+
+AI-optimized browser automation integrating [agent-browser](https://github.com/AugmentCode/agent-browser) with claude-flow for intelligent web automation, trajectory learning, and multi-agent browser coordination.
+
+### Quick Start
+
+```typescript
+import { createBrowserService } from '@claude-flow/browser';
+
+const browser = createBrowserService({
+  sessionId: 'my-session',
+  enableSecurity: true,
+  enableMemory: true,
+});
+
+// Start trajectory tracking for learning
+browser.startTrajectory('Login to dashboard');
+
+// Navigate (auto security-scanned)
+await browser.open('https://example.com/login');
+
+// Get AI-optimized snapshot with element refs
+const snapshot = await browser.snapshot({ interactive: true });
+
+// Use refs instead of selectors (93% context reduction)
+await browser.fill('@e1', 'user@example.com');
+await browser.click('@e2');
+
+// End trajectory and store for learning
+await browser.endTrajectory(true, 'Login successful');
+await browser.close();
+```
+
+### Key Features
+
+| Feature | Description |
+|---------|-------------|
+| **59 MCP Tools** | Complete browser automation via MCP protocol |
+| **Element Refs** | 93% context reduction with `@e1`, `@e2` refs |
+| **Trajectory Learning** | Records actions for ReasoningBank/SONA |
+| **Security Scanning** | URL validation, PII detection, XSS prevention |
+| **9 Workflow Templates** | Login, scraping, testing, monitoring |
+| **Swarm Coordination** | Multi-session parallel browser automation |
+
+### Main Exports
+
+```typescript
+// Core
+import { createBrowserService, BrowserService } from '@claude-flow/browser';
+
+// MCP Tools
+import { browserTools } from '@claude-flow/browser';
+
+// Security
+import { getSecurityScanner, isUrlSafe, containsPII } from '@claude-flow/browser';
+
+// Memory
+import { createMemoryManager, getMemoryAdapter } from '@claude-flow/browser';
+
+// Workflows
+import { listWorkflows, getWorkflow, getWorkflowManager } from '@claude-flow/browser';
+```
+
+📖 [Full Documentation](./v3/@claude-flow/browser/README.md)
 
 </details>
 
