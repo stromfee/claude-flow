@@ -320,6 +320,7 @@ export const DEFAULT_INIT_OPTIONS: InitOptions = {
     agentdb: true,
     github: true,
     flowNexus: false,
+    browser: true,
     v3: true,
     all: false,
   },
