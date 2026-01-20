@@ -1082,12 +1082,29 @@ function generateStatusline() {
   const sizeDisplay = agentdb.dbSizeKB >= 1024
     ? \`\${(agentdb.dbSizeKB / 1024).toFixed(1)}MB\`
     : \`\${agentdb.dbSizeKB}KB\`;
+  // Build integration status string
+  let integrationStr = '';
+  if (integration.mcpServers.total > 0) {
+    const mcpColor = integration.mcpServers.enabled === integration.mcpServers.total ? c.brightGreen :
+                     integration.mcpServers.enabled > 0 ? c.brightYellow : c.red;
+    integrationStr += \`\${c.cyan}MCP\${c.reset} \${mcpColor}●\${integration.mcpServers.enabled}/\${integration.mcpServers.total}\${c.reset}\`;
+  }
+  if (integration.hasDatabase) {
+    integrationStr += (integrationStr ? '  ' : '') + \`\${c.brightGreen}◆\${c.reset}DB\`;
+  }
+  if (integration.hasApi) {
+    integrationStr += (integrationStr ? '  ' : '') + \`\${c.brightGreen}◆\${c.reset}API\`;
+  }
+  if (!integrationStr) {
+    integrationStr = \`\${c.dim}●none\${c.reset}\`;
+  }
+
   lines.push(
     \`\${c.brightCyan}📊 AgentDB\${c.reset}    \` +
     \`\${c.cyan}Vectors\${c.reset} \${vectorColor}●\${agentdb.vectorCount}\${hnswIndicator}\${c.reset}  \${c.dim}│\${c.reset}  \` +
     \`\${c.cyan}Size\${c.reset} \${c.brightWhite}\${sizeDisplay}\${c.reset}  \${c.dim}│\${c.reset}  \` +
     \`\${c.cyan}Tests\${c.reset} \${testColor}●\${tests.testFiles}\${c.reset} \${c.dim}(\${tests.testCases} cases)\${c.reset}  \${c.dim}│\${c.reset}  \` +
-    \`\${c.cyan}Integration\${c.reset} \${swarm.coordinationActive ? c.brightCyan : c.dim}●\${c.reset}\`
+    integrationStr
   );
 
   return lines.join('\\n');
