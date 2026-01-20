@@ -51,7 +51,7 @@ const c = {
 function getUserInfo() {
   let name = 'user';
   let gitBranch = '';
-  let modelName = 'Unknown';
+  let modelName = '🤖 Claude Code';
 
   try {
     name = execSync('git config user.name 2>/dev/null || echo "user"', { encoding: 'utf-8' }).trim();
@@ -372,15 +372,85 @@ function getSystemMetrics() {
   // Also get AgentDB stats for fallback intelligence calculation
   const agentdbStats = getAgentDBStats();
 
-  // Intelligence % based on learned patterns or vectors (0 = 0%, 1000+ = 100%)
+  // Intelligence % based on learned patterns, vectors, or project maturity
+  // Calculate all sources and take the maximum
   let intelligencePct = 0;
+
   if (intelligenceFromFile !== null) {
     intelligencePct = intelligenceFromFile;
-  } else if (learning.patterns > 0) {
-    intelligencePct = Math.min(100, Math.floor(learning.patterns / 10));
-  } else if (agentdbStats.vectorCount > 0) {
-    // Use vector count as fallback (100 vectors = 1%, 10000+ = 100%)
-    intelligencePct = Math.min(100, Math.floor(agentdbStats.vectorCount / 100));
+  } else {
+    // Calculate from multiple sources and take the best
+    const fromPatterns = learning.patterns > 0 ? Math.min(100, Math.floor(learning.patterns / 10)) : 0;
+    const fromVectors = agentdbStats.vectorCount > 0 ? Math.min(100, Math.floor(agentdbStats.vectorCount / 100)) : 0;
+
+    intelligencePct = Math.max(fromPatterns, fromVectors);
+  }
+
+  // If still 0, use project maturity fallback
+  if (intelligencePct === 0) {
+    // Final fallback: estimate from project maturity indicators
+    let maturityScore = 0;
+
+    // Check git commit count (proxy for project development)
+    try {
+      const commitCount = parseInt(execSync('git rev-list --count HEAD 2>/dev/null || echo "0"', { encoding: 'utf-8' }).trim());
+      maturityScore += Math.min(30, Math.floor(commitCount / 10)); // Max 30% from commits
+    } catch (e) { /* ignore */ }
+
+    // Check for Claude session history
+    const sessionPaths = [
+      path.join(process.cwd(), '.claude', 'sessions'),
+      path.join(process.cwd(), '.claude-flow', 'sessions'),
+    ];
+    for (const sessPath of sessionPaths) {
+      if (fs.existsSync(sessPath)) {
+        try {
+          const sessions = fs.readdirSync(sessPath).filter(f => f.endsWith('.json')).length;
+          maturityScore += Math.min(20, sessions * 2); // Max 20% from sessions
+          break;
+        } catch (e) { /* ignore */ }
+      }
+    }
+
+    // Check for source files (indicates codebase size)
+    try {
+      const srcDirs = ['src', 'lib', 'app', 'packages'];
+      for (const dir of srcDirs) {
+        const dirPath = path.join(process.cwd(), dir);
+        if (fs.existsSync(dirPath)) {
+          maturityScore += 15; // Base score for having source dir
+          break;
+        }
+      }
+    } catch (e) { /* ignore */ }
+
+    // Check for test files
+    try {
+      const testDirs = ['tests', 'test', '__tests__', 'spec'];
+      for (const dir of testDirs) {
+        const dirPath = path.join(process.cwd(), dir);
+        if (fs.existsSync(dirPath)) {
+          maturityScore += 10; // Bonus for having tests
+          break;
+        }
+      }
+    } catch (e) { /* ignore */ }
+
+    // Check for .claude directory (Claude Code usage)
+    if (fs.existsSync(path.join(process.cwd(), '.claude'))) {
+      maturityScore += 15; // Bonus for Claude Code integration
+    }
+
+    // Check for config files (project maturity)
+    const configFiles = ['package.json', 'tsconfig.json', 'pyproject.toml', 'Cargo.toml', 'go.mod'];
+    for (const cfg of configFiles) {
+      if (fs.existsSync(path.join(process.cwd(), cfg))) {
+        maturityScore += 5;
+        break;
+      }
+    }
+
+    intelligencePct = Math.min(100, maturityScore);
   }
 
   // Context % based on session history (0 sessions = 0%, grows with usage)

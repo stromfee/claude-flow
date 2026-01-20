@@ -771,6 +771,121 @@ function getTestStats() {
   return { testFiles, testCases };
 }
 
+// Get git status (uncommitted changes, untracked files)
+function getGitStatus() {
+  let modified = 0;
+  let untracked = 0;
+  let staged = 0;
+  let branch = '';
+  let ahead = 0;
+  let behind = 0;
+
+  try {
+    // Get modified and staged counts
+    const status = execSync('git status --porcelain 2>/dev/null || echo ""', { encoding: 'utf-8' });
+    const lines = status.trim().split('\\n').filter(l => l);
+    for (const line of lines) {
+      const code = line.substring(0, 2);
+      if (code.includes('M') || code.includes('D') || code.includes('R')) {
+        if (code[0] !== ' ') staged++;
+        if (code[1] !== ' ') modified++;
+      }
+      if (code.includes('?')) untracked++;
+      if (code.includes('A')) staged++;
+    }
+
+    // Get ahead/behind
+    try {
+      const abStatus = execSync('git rev-list --left-right --count HEAD...@{upstream} 2>/dev/null || echo "0 0"', { encoding: 'utf-8' });
+      const [a, b] = abStatus.trim().split(/\\s+/).map(n => parseInt(n) || 0);
+      ahead = a;
+      behind = b;
+    } catch (e) { /* no upstream */ }
+
+  } catch (e) {
+    // Not a git repo or error
+  }
+
+  return { modified, untracked, staged, ahead, behind };
+}
+
+// Get session statistics
+function getSessionStats() {
+  let sessionStart = null;
+  let duration = '';
+  let lastActivity = '';
+  let operationsCount = 0;
+
+  // Check for session file
+  const sessionPaths = [
+    path.join(process.cwd(), '.claude-flow', 'session.json'),
+    path.join(process.cwd(), '.claude', 'session.json'),
+  ];
+
+  for (const sessPath of sessionPaths) {
+    if (fs.existsSync(sessPath)) {
+      try {
+        const data = JSON.parse(fs.readFileSync(sessPath, 'utf-8'));
+        if (data.startTime) {
+          sessionStart = new Date(data.startTime);
+          const now = new Date();
+          const diffMs = now.getTime() - sessionStart.getTime();
+          const diffMins = Math.floor(diffMs / 60000);
+          if (diffMins < 60) {
+            duration = \`\${diffMins}m\`;
+          } else {
+            const hours = Math.floor(diffMins / 60);
+            const mins = diffMins % 60;
+            duration = \`\${hours}h\${mins}m\`;
+          }
+        }
+        if (data.lastActivity) {
+          const last = new Date(data.lastActivity);
+          const now = new Date();
+          const diffMs = now.getTime() - last.getTime();
+          const diffMins = Math.floor(diffMs / 60000);
+          if (diffMins < 1) lastActivity = 'now';
+          else if (diffMins < 60) lastActivity = \`\${diffMins}m ago\`;
+          else lastActivity = \`\${Math.floor(diffMins / 60)}h ago\`;
+        }
+        operationsCount = data.operationsCount || data.commandCount || 0;
+        break;
+      } catch (e) { /* ignore */ }
+    }
+  }
+
+  // Fallback: check metrics for activity
+  if (!duration) {
+    const metricsPath = path.join(process.cwd(), '.claude-flow', 'metrics', 'activity.json');
+    if (fs.existsSync(metricsPath)) {
+      try {
+        const data = JSON.parse(fs.readFileSync(metricsPath, 'utf-8'));
+        operationsCount = data.totalOperations || 0;
+      } catch (e) { /* ignore */ }
+    }
+  }
+
+  return { duration, lastActivity, operationsCount };
+}
+
+// Get trend indicator based on change
+function getTrend(current, previous) {
+  if (previous === null || previous === undefined) return '';
+  if (current > previous) return \`\${c.brightGreen}↑\${c.reset}\`;
+  if (current < previous) return \`\${c.brightRed}↓\${c.reset}\`;
+  return \`\${c.dim}→\${c.reset}\`;
+}
+
+// Store previous values for trends (persisted between calls)
+let prevIntelligence = null;
+try {
+  const trendPath = path.join(process.cwd(), '.claude-flow', '.trend-cache.json');
+  if (fs.existsSync(trendPath)) {
+    const data = JSON.parse(fs.readFileSync(trendPath, 'utf-8'));
+    prevIntelligence = data.intelligence;
+  }
+} catch (e) { /* ignore */ }
+
 // Generate progress bar
 function progressBar(current, total) {
   const width = 5;
