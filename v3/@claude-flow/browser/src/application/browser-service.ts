@@ -72,7 +72,7 @@ export class BrowserService {
   /**
    * Record a step in the current trajectory
    */
-  private recordStep(action: string, input: Record<string, unknown>, result: ActionResult): void {
+  private recordStep(action: string, input: Record<string, unknown> | object, result: ActionResult): void {
     if (!this.currentTrajectory) return;
 
     const trajectory = activeTrajectories.get(this.currentTrajectory);
