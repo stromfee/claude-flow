@@ -465,6 +465,7 @@ export const FULL_INIT_OPTIONS: InitOptions = {
     agentdb: true,
     github: true,
     flowNexus: true,
+    browser: true,
     v3: true,
     all: true,
   },
