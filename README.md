@@ -1961,7 +1961,7 @@ Shell-based daemons for monitoring (Linux/macOS only):
 ---
 
 <details>
-<summary><h2>🪝Hooks, Event Hooks, Workers & Pattern Intelligence</h2></summary>
+<summary>🪝 <strong>Hooks, Event Hooks, Workers & Pattern Intelligence</strong></summary>
 
 ### What Are Hooks?
 
