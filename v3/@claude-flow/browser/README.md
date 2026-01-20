@@ -193,7 +193,7 @@ const piiResult = browser.scanForPII('SSN: 123-45-6789');
 ---
 
 <details>
-<summary><h2>🔌 Integrations</h2></summary>
+<summary><strong>🔌 Integrations</strong></summary>
 
 ### Memory Integration
 
