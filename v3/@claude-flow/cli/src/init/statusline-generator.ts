@@ -971,7 +971,7 @@ function generateStatusline() {
     \`\${c.brightBlue}🪝 \${hooksColor}\${hooks.enabled}\${c.reset}/\${c.brightWhite}\${hooks.total}\${c.reset}    \` +
     \`\${securityIcon} \${securityColor}CVE \${security.cvesFixed}\${c.reset}/\${c.brightWhite}\${security.totalCves}\${c.reset}    \` +
     \`\${c.brightCyan}💾 \${system.memoryMB}MB\${c.reset}    \` +
-    \`\${c.dim}🧠 \${String(system.intelligencePct).padStart(3)}%\${c.reset}\`
+    \`\${system.intelligencePct >= 80 ? c.brightGreen : system.intelligencePct >= 40 ? c.brightYellow : c.dim}🧠 \${String(system.intelligencePct).padStart(3)}%\${intellTrend}\${c.reset}\`
   );
 
   // Line 3: Architecture status with ADRs, AgentDB, Tests
