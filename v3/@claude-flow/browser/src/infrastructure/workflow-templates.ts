@@ -246,7 +246,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
     ],
     steps: [
       { id: 'navigate', action: 'open', target: '\${url}', waitAfter: 1000 },
-      { id: 'fill-name', action: 'fill', target: '#name, [name="name"], [placeholder*="name" i]', value: '${name}' },
+      { id: 'fill-name', action: 'fill', target: '#name, [name="name"], [placeholder*="name" i]', value: '\${name}' },
       { id: 'fill-email', action: 'fill', target: '#email, [name="email"], [type="email"]', value: '\${email}' },
       { id: 'fill-message', action: 'fill', target: '#message, [name="message"], textarea', value: '${message}' },
       { id: 'submit', action: 'click', target: '\${submitSelector}', waitAfter: 2000 },
