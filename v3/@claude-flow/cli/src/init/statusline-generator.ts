@@ -201,51 +201,56 @@ function getLearningStats() {
 // Get V3 progress from learning state (grows as system learns)
 function getV3Progress() {
   const learning = getLearningStats();
+  const totalDomains = 5;
 
-  // Check for metrics file first (created by init)
+  // Calculate domains from patterns (always do this as baseline)
+  // Thresholds: 10+ patterns = 1 domain, 50+ = 2, 100+ = 3, 200+ = 4, 500+ = 5
+  let domainsFromPatterns = 0;
+  if (learning.patterns >= 500) domainsFromPatterns = 5;
+  else if (learning.patterns >= 200) domainsFromPatterns = 4;
+  else if (learning.patterns >= 100) domainsFromPatterns = 3;
+  else if (learning.patterns >= 50) domainsFromPatterns = 2;
+  else if (learning.patterns >= 10) domainsFromPatterns = 1;
+
+  // Check for metrics file (may have more accurate data)
+  let fileDomainsCompleted = 0;
+  let fileDddProgress = 0;
+  let filePatternsLearned = 0;
+  let fileSessionsCompleted = 0;
+
   const metricsPath = path.join(process.cwd(), '.claude-flow', 'metrics', 'v3-progress.json');
   if (fs.existsSync(metricsPath)) {
     try {
       const data = JSON.parse(fs.readFileSync(metricsPath, 'utf-8'));
       if (data.domains) {
-        const domainsCompleted = data.domains.completed || 0;
-        const totalDomains = data.domains.total || 5;
-        // Use ddd.progress if provided and > 0, otherwise calculate from domains
-        const dddProgress = (data.ddd?.progress > 0)
-          ? data.ddd.progress
-          : Math.min(100, Math.floor((domainsCompleted / totalDomains) * 100));
-        return {
-          domainsCompleted,
-          totalDomains,
-          dddProgress,
-          patternsLearned: data.learning?.patternsLearned || learning.patterns,
-          sessionsCompleted: data.learning?.sessionsCompleted || learning.sessions
-        };
+        fileDomainsCompleted = data.domains.completed || 0;
+        fileDddProgress = data.ddd?.progress || 0;
+        filePatternsLearned = data.learning?.patternsLearned || 0;
+        fileSessionsCompleted = data.learning?.sessionsCompleted || 0;
       }
     } catch (e) {
-      // Fall through to pattern-based calculation
+      // Ignore - use pattern-based calculation
     }
   }
 
-  // DDD progress based on actual learned patterns
-  // New install: 0 patterns = 0/5 domains, 0% DDD
-  // As patterns grow: 10+ patterns = 1 domain, 50+ = 2, 100+ = 3, 200+ = 4, 500+ = 5
-  let domainsCompleted = 0;
-  if (learning.patterns >= 500) domainsCompleted = 5;
-  else if (learning.patterns >= 200) domainsCompleted = 4;
-  else if (learning.patterns >= 100) domainsCompleted = 3;
-  else if (learning.patterns >= 50) domainsCompleted = 2;
-  else if (learning.patterns >= 10) domainsCompleted = 1;
+  // Take the MAXIMUM of file data and pattern calculation
+  // This ensures we don't show 0 when we have patterns
+  const domainsCompleted = Math.max(fileDomainsCompleted, domainsFromPatterns);
+  const patternsLearned = Math.max(filePatternsLearned, learning.patterns);
+  const sessionsCompleted = Math.max(fileSessionsCompleted, learning.sessions);
 
-  const totalDomains = 5;
-  const dddProgress = Math.min(100, Math.floor((domainsCompleted / totalDomains) * 100));
+  // Calculate DDD progress: use file value if > 0, otherwise calculate from domains
+  let dddProgress = fileDddProgress;
+  if (dddProgress === 0 && domainsCompleted > 0) {
+    dddProgress = Math.min(100, Math.floor((domainsCompleted / totalDomains) * 100));
+  }
 
   return {
     domainsCompleted,
     totalDomains,
     dddProgress,
-    patternsLearned: learning.patterns,
-    sessionsCompleted: learning.sessions
+    patternsLearned,
+    sessionsCompleted
   };
 }
 

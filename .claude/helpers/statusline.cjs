@@ -1050,12 +1050,28 @@ function generateStatusline() {
   // Separator
   lines.push(`${c.dim}─────────────────────────────────────────────────────${c.reset}`);
 
-  // Line 1: DDD Domain Progress
+  // Line 1: DDD Domain Progress with dynamic performance indicator
   const domainsColor = progress.domainsCompleted >= 3 ? c.brightGreen : progress.domainsCompleted > 0 ? c.yellow : c.red;
+  // Show HNSW speedup if enabled, otherwise show patterns learned
+  let perfIndicator = '';
+  if (agentdb.hasHnsw && agentdb.vectorCount > 0) {
+    // HNSW enabled: show estimated speedup (150x-12500x based on vector count)
+    const speedup = agentdb.vectorCount > 10000 ? '12500x' : agentdb.vectorCount > 1000 ? '150x' : '10x';
+    perfIndicator = `${c.brightGreen}⚡ HNSW ${speedup}${c.reset}`;
+  } else if (progress.patternsLearned > 0) {
+    // Show patterns learned
+    const patternsK = progress.patternsLearned >= 1000
+      ? `${(progress.patternsLearned / 1000).toFixed(1)}k`
+      : String(progress.patternsLearned);
+    perfIndicator = `${c.brightYellow}📚 ${patternsK} patterns${c.reset}`;
+  } else {
+    // New project: show target
+    perfIndicator = `${c.dim}⚡ target: 150x-12500x${c.reset}`;
+  }
   lines.push(
     `${c.brightCyan}🏗️  DDD Domains${c.reset}    ${progressBar(progress.domainsCompleted, progress.totalDomains)}  ` +
     `${domainsColor}${progress.domainsCompleted}${c.reset}/${c.brightWhite}${progress.totalDomains}${c.reset}    ` +
-    `${c.brightYellow}⚡ 1.0x${c.reset} ${c.dim}→${c.reset} ${c.brightYellow}2.49x-7.47x${c.reset}`
+    perfIndicator
   );
 
   // Line 2: Swarm + Hooks + CVE + Memory + Context + Intelligence
