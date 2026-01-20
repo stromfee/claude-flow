@@ -537,7 +537,7 @@ docker compose --profile debug up browser-debug
 ---
 
 <details>
-<summary><h2>⚙️ Configuration</h2></summary>
+<summary><strong>⚙️ Configuration</strong></summary>
 
 ### TypeScript
 
