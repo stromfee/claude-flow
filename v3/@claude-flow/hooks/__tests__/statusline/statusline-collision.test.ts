@@ -130,14 +130,14 @@ describe('Statusline Collision Zone Avoidance', () => {
       const collisionLine = stripAnsi(lines[collisionLineIndex]);
 
       // The line should start with 🤖 followed by spaces for padding
-      // After the emoji (2 cols), there should be at least 13 spaces
-      // to push content past column 25
+      // After the emoji (2 cols), there should be at least 24 spaces
+      // to push content past column 25 (collision zone is cols 15-25)
       const match = collisionLine.match(/^🤖(\s+)/);
       expect(match).not.toBeNull();
 
       if (match) {
-        // At least 13 spaces after the emoji (emoji is 2 cols, need to reach col 26+)
-        expect(match[1].length).toBeGreaterThanOrEqual(13);
+        // At least 24 spaces after the emoji (emoji is 2 cols, 2+24=26 > 25)
+        expect(match[1].length).toBeGreaterThanOrEqual(24);
       }
     }
   });
