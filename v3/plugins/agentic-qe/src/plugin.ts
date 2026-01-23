@@ -139,7 +139,7 @@ interface QEHookDefinition {
   name: string;
   event: string;
   priority: 'low' | 'normal' | 'high' | 'critical';
-  handler: (context: QEPluginContext, data: unknown) => Promise<void>;
+  handler: string | ((context: IPluginContext, data: unknown) => Promise<void>);
 }
 
 /**
@@ -148,7 +148,9 @@ interface QEHookDefinition {
 interface QEWorkerDefinition {
   name: string;
   type: string;
-  handler: (context: QEPluginContext, input: unknown) => Promise<unknown>;
+  capabilities?: string[];
+  maxConcurrent?: number;
+  handler?: (context: IPluginContext, input: unknown) => Promise<unknown>;
 }
 
 /**
@@ -156,9 +158,12 @@ interface QEWorkerDefinition {
  */
 interface QEAgentDefinition {
   id: string;
+  name?: string;
   type: string;
-  context: string;
+  context: string | BoundedContext;
   capabilities: string[];
+  modelTier?: string;
+  description?: string;
 }
 
 /**
