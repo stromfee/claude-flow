@@ -95,16 +95,19 @@ interface IMCPTool {
   name: string;
   description: string;
   inputSchema: Record<string, unknown>;
-  execute(input: unknown, context: QEPluginContext): Promise<MCPToolResult>;
+  category?: string;
+  execute(input: unknown, context: IPluginContext): Promise<MCPToolResult>;
 }
 
 /**
  * MCP tool result
  */
 interface MCPToolResult {
-  success: boolean;
+  content?: Array<{ type: string; text: string }>;
+  success?: boolean;
   data?: unknown;
   error?: string;
+  isError?: boolean;
 }
 
 /**
