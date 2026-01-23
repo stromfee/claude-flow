@@ -1227,7 +1227,7 @@ export class AQEPlugin implements IPlugin {
 
   private async handleTDDCycle(
     input: unknown,
-    context: IPluginContext
+    _context: IPluginContext
   ): Promise<MCPToolResult> {
     const result = {
       status: 'success',
