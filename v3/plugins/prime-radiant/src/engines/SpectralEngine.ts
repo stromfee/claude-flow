@@ -278,7 +278,7 @@ export class SpectralEngine implements ISpectralEngine {
   /**
    * Normalize vector to unit length
    */
-  private normalizeVector(v: Float32Array): Float32Array {
+  private normalizeVector(v: Float32Array<ArrayBufferLike>): Float32Array<ArrayBufferLike> {
     let norm = 0;
     for (let i = 0; i < v.length; i++) {
       const vi = v[i] ?? 0;
