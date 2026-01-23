@@ -429,7 +429,7 @@ class SecuritySandbox implements ISecuritySandbox {
       timeout?: number;
     } = {}
   ): Promise<T> {
-    const timeout = options.timeout ?? this.config.maxExecutionTime;
+    const timeout = options.timeout ?? this.config?.maxExecutionTime ?? 30000;
     const level = options.securityLevel ?? 'medium';
 
     // Validate execution is allowed
