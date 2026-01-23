@@ -139,6 +139,7 @@ interface QEHookDefinition {
   name: string;
   event: string;
   priority: 'low' | 'normal' | 'high' | 'critical';
+  description?: string;
   handler: string | ((context: IPluginContext, data: unknown) => Promise<void>);
 }
 
