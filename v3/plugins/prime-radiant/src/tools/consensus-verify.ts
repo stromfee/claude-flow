@@ -91,20 +91,28 @@ function identifyDivergentAgents(
   const divergentAgents: string[] = [];
 
   // Compute centroid
-  const dim = embeddings[0].length;
-  const centroid = new Array(dim).fill(0);
+  const firstEmb = embeddings[0];
+  if (!firstEmb) return [];
+
+  const dim = firstEmb.length;
+  const centroid: number[] = new Array(dim).fill(0);
 
   for (const emb of embeddings) {
     for (let d = 0; d < dim; d++) {
-      centroid[d] += emb[d] / n;
+      const val = emb[d];
+      if (val !== undefined) {
+        centroid[d] = (centroid[d] ?? 0) + val / n;
+      }
     }
   }
 
   // Find agents far from centroid
   for (let i = 0; i < n; i++) {
-    const similarity = cosineSimilarity(embeddings[i], centroid);
+    const embi = embeddings[i]!;
+    const agentState = agentStates[i]!;
+    const similarity = cosineSimilarity(embi, centroid);
     if (similarity < threshold) {
-      divergentAgents.push(agentStates[i].agentId);
+      divergentAgents.push(agentState.agentId);
     }
   }
 
