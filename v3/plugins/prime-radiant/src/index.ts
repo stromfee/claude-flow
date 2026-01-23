@@ -31,7 +31,7 @@ export {
   WasmBridge,
   createWasmBridge,
   initializeWasmBridge
-} from './wasm-bridge';
+} from './wasm-bridge.js';
 
 // ============================================================================
 // Engine Exports
