@@ -266,7 +266,8 @@ export class CohomologyEngine implements ICohomologyEngine {
   private vectorNorm(v: Float32Array): number {
     let sum = 0;
     for (let i = 0; i < v.length; i++) {
-      sum += v[i] * v[i];
+      const vi = v[i] ?? 0;
+      sum += vi * vi;
     }
     return Math.sqrt(sum);
   }
