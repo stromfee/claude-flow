@@ -1196,7 +1196,7 @@ export class AQEPlugin implements IPlugin {
 
     // Check if dry run
     if (!typedInput.dryRun) {
-      const uiService = context.getUIService();
+      const uiService = context.getUIService?.();
       if (uiService) {
         const confirmed = await uiService.confirm(
           `WARNING: This will inject ${typedInput.failureType} into ${typedInput.target}. Continue?`
