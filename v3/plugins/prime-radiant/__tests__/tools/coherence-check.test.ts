@@ -268,12 +268,13 @@ describe('CoherenceCheckTool', () => {
     });
 
     it('should respect custom threshold', async () => {
+      // Use vectors with ~0.3 dissimilarity for clear threshold testing
       const vectors = [
         [1, 0, 0],
-        [0.8, 0.2, 0],
+        [0.7, 0.7, 0], // ~45 degree angle, ~0.29 dissimilarity
       ];
 
-      const strictResult = await tool.execute({ vectors, threshold: 0.05 });
+      const strictResult = await tool.execute({ vectors, threshold: 0.1 });
       const lenientResult = await tool.execute({ vectors, threshold: 0.5 });
 
       expect(strictResult.coherent).toBe(false);
