@@ -1137,6 +1137,90 @@ Build custom plugins with the fluent builder API. Create MCP tools, hooks, worke
 </details>
 
 <details>
+<summary>📦 <strong>Plugin Marketplace</strong> — Install and manage plugins from the registry</summary>
+
+Discover, install, and manage plugins directly from the Claude Flow CLI.
+
+### Available Official Plugins
+
+| Plugin | Description | Category |
+|--------|-------------|----------|
+| `@claude-flow/plugin-agentic-qe` | AI-powered quality engineering with 58 agents for test generation, security scanning, chaos engineering, and defect prediction | QE, Testing, Security |
+| `@claude-flow/plugin-prime-radiant` | Mathematical coherence checking, consensus verification, and hallucination prevention using sheaf cohomology | AI Safety, Validation |
+| `@claude-flow/neural` | Neural pattern training with WASM SIMD, MoE routing, Flash Attention | AI/ML |
+| `@claude-flow/security` | Security scanning, CVE detection, compliance auditing | Security |
+| `@claude-flow/embeddings` | Vector embeddings with sql.js, hyperbolic space | AI/ML |
+| `@claude-flow/claims` | Claims-based authorization for access control | Security |
+| `@claude-flow/performance` | Performance profiling and benchmarking | DevOps |
+| `plugin-creator` | Plugin scaffolding and development toolkit | Development |
+
+### Plugin Management Commands
+
+```bash
+# List all available plugins from the registry
+npx claude-flow@v3alpha plugins list
+
+# Search for plugins by keyword
+npx claude-flow@v3alpha plugins search --query "testing"
+npx claude-flow@v3alpha plugins search --query "security"
+
+# Get detailed information about a plugin
+npx claude-flow@v3alpha plugins info --name @claude-flow/plugin-agentic-qe
+
+# Install a plugin
+npx claude-flow@v3alpha plugins install --name @claude-flow/plugin-agentic-qe
+npx claude-flow@v3alpha plugins install --name @claude-flow/plugin-prime-radiant
+
+# Uninstall a plugin
+npx claude-flow@v3alpha plugins uninstall --name @claude-flow/plugin-agentic-qe
+
+# Enable/disable a plugin
+npx claude-flow@v3alpha plugins toggle --name @claude-flow/plugin-agentic-qe --enable
+npx claude-flow@v3alpha plugins toggle --name @claude-flow/plugin-agentic-qe --disable
+```
+
+### Featured Plugins
+
+**🧪 Agentic Quality Engineering** (`@claude-flow/plugin-agentic-qe`)
+- 58 AI agents for comprehensive quality assurance
+- Automatic test generation (unit, integration, E2E)
+- TDD workflow automation (red-green-refactor)
+- Security scanning (SAST, OWASP Top 10, SANS 25)
+- Chaos engineering with safety controls
+- Defect prediction using ML patterns
+
+```bash
+# Install and use
+npx claude-flow@v3alpha plugins install --name @claude-flow/plugin-agentic-qe
+
+# Generate tests for a file
+npx claude-flow@v3alpha mcp call aqe/generate-tests --targetPath ./src/auth.ts --framework vitest
+
+# Run security scan
+npx claude-flow@v3alpha mcp call aqe/security-scan --targetPath ./src --compliance owasp-top-10
+```
+
+**🔬 Prime Radiant** (`@claude-flow/plugin-prime-radiant`)
+- Mathematical coherence checking using Sheaf Laplacian
+- Multi-agent consensus verification
+- Hallucination prevention for RAG systems
+- Swarm stability analysis via spectral graph theory
+- Causal inference with do-calculus
+
+```bash
+# Install and use
+npx claude-flow@v3alpha plugins install --name @claude-flow/plugin-prime-radiant
+
+# Check information coherence
+npx claude-flow@v3alpha mcp call pr_coherence_check --vectors [...] --threshold 0.3
+
+# Verify agent consensus
+npx claude-flow@v3alpha mcp call pr_consensus_verify --agentStates [...]
+```
+
+</details>
+
+<details>
 <summary>🪝 <strong>Plugin Hook Events</strong> — 25+ lifecycle hooks for full control</summary>
 
 Intercept and extend any operation with pre/post hooks.
