@@ -91,6 +91,28 @@ export type {
   PrimeRadiantErrorCode,
 } from './types';
 
+// WASM bridge types from wasm-bridge types file
+export type {
+  WasmModule,
+  WasmBridgeConfig,
+  WasmStatus,
+  // Additional domain types from wasm-bridge types
+  CoherenceResult,
+  SpectralResult,
+  CausalResult as WasmCausalResult,
+  TopologyResult as WasmTopologyResult,
+  Intervention,
+  Sheaf,
+  Matrix,
+  SimplicialComplex,
+  Filtration,
+  Morphism,
+  Functor,
+  Path,
+  TypedValue,
+  HottResult,
+} from './types';
+
 export { DEFAULT_CONFIG, PrimeRadiantErrorCodes } from './types';
 
 // ============================================================================
