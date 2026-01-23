@@ -446,7 +446,7 @@ describe('QESecurityBridge', () => {
       const result = await bridge.validatePath('/etc/passwd');
 
       expect(result.valid).toBe(false);
-      expect(result.violations).toContain(expect.stringContaining('/etc'));
+      expect(result.violations.some(v => v.includes('/etc'))).toBe(true);
       expect(result.riskLevel).toBe('critical');
     });
 
