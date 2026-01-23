@@ -465,7 +465,7 @@ class SecuritySandbox implements ISecuritySandbox {
 
     // Critical operations require explicit approval
     if (levelPriority[level] >= 4 && operation === 'execute') {
-      return this.config.networkPolicy !== 'blocked';
+      return this.config?.networkPolicy !== 'blocked';
     }
 
     return true;
