@@ -146,7 +146,7 @@ export class SpectralEngine implements ISpectralEngine {
     // Stability index based on eigenvalue distribution
     const sorted = [...eigenvalues].sort((a, b) => b - a);
     const spectralGap = this.computeSpectralGap(sorted);
-    const maxEig = Math.abs(sorted[0]);
+    const maxEig = Math.abs(sorted[0] ?? 0);
 
     if (maxEig === 0) return 1;
 
