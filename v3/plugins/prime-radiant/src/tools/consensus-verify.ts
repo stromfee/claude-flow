@@ -152,20 +152,24 @@ function computeSpectralStability(similarityMatrix: number[][]): {
   // Convert similarity to adjacency (threshold at 0.5)
   const adjacency: number[][] = [];
   for (let i = 0; i < n; i++) {
-    adjacency[i] = [];
+    const row: number[] = [];
+    const simRow = similarityMatrix[i]!;
     for (let j = 0; j < n; j++) {
-      adjacency[i][j] = similarityMatrix[i][j] > 0.5 ? similarityMatrix[i][j] : 0;
+      const simVal = simRow[j] ?? 0;
+      row.push(simVal > 0.5 ? simVal : 0);
     }
+    adjacency.push(row);
   }
 
   // Compute degree matrix and Laplacian
   const degrees: number[] = [];
   for (let i = 0; i < n; i++) {
     let degree = 0;
+    const adjRow = adjacency[i]!;
     for (let j = 0; j < n; j++) {
-      degree += adjacency[i][j];
+      degree += adjRow[j] ?? 0;
     }
-    degrees[i] = degree;
+    degrees.push(degree);
   }
 
   // Estimate spectral gap using power iteration on Laplacian
