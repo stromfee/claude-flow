@@ -10,9 +10,8 @@ import type {
   ISpectralEngine,
   SpectralResult,
   SpectralGap,
-  Matrix,
   WasmModule
-} from '../types';
+} from '../types.js';
 
 /**
  * SpectralEngine - WASM wrapper for spectral stability analysis
