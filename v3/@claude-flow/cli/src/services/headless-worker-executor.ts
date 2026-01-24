@@ -633,6 +633,7 @@ export class HeadlessWorkerExecutor extends EventEmitter {
         encoding: 'utf-8',
         stdio: 'pipe',
         timeout: 5000,
+        windowsHide: true, // Prevent phantom console windows on Windows
       });
       this.claudeCodeAvailable = true;
       this.claudeCodeVersion = output.trim();
