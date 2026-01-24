@@ -273,6 +273,148 @@ Executive Control
 | Memory consolidation | <100ms batch | ~1s (full reindex) | 10x |
 | Scaffold generation | <50ms per step | N/A (manual prompting) | Novel |
 
+## Security Considerations
+
+### Input Validation (CRITICAL)
+
+All MCP tool inputs MUST be validated using Zod schemas:
+
+```typescript
+// cognition/working-memory input validation
+const WorkingMemorySchema = z.object({
+  action: z.enum(['allocate', 'update', 'retrieve', 'clear', 'consolidate']),
+  slot: z.object({
+    id: z.string().max(100).optional(),
+    content: z.unknown().optional(),
+    priority: z.number().min(0).max(1).default(0.5),
+    decay: z.number().min(0).max(1).default(0.1)
+  }).optional(),
+  capacity: z.number().int().min(1).max(20).default(7), // Miller's Law limit
+  consolidationTarget: z.enum(['episodic', 'semantic', 'procedural']).optional()
+});
+
+// cognition/attention-control input validation
+const AttentionControlSchema = z.object({
+  mode: z.enum(['focus', 'diffuse', 'selective', 'divided', 'sustained']),
+  targets: z.array(z.object({
+    entity: z.string().max(500),
+    weight: z.number().min(0).max(1),
+    duration: z.number().min(0).max(3600) // Max 1 hour
+  })).max(50).optional(),
+  filters: z.object({
+    includePatterns: z.array(z.string().max(200)).max(50).optional(),
+    excludePatterns: z.array(z.string().max(200)).max(50).optional(),
+    noveltyBias: z.number().min(0).max(1).default(0.5)
+  }).optional()
+});
+
+// cognition/scaffold input validation
+const ScaffoldSchema = z.object({
+  task: z.object({
+    description: z.string().max(5000),
+    complexity: z.enum(['simple', 'moderate', 'complex', 'expert']),
+    domain: z.string().max(200).optional()
+  }),
+  scaffoldType: z.enum([
+    'decomposition', 'analogy', 'worked_example',
+    'socratic', 'metacognitive_prompting', 'chain_of_thought'
+  ]),
+  adaptivity: z.object({
+    fading: z.boolean().default(true),
+    monitoring: z.boolean().default(true)
+  }).optional()
+});
+```
+
+### WASM Security Constraints
+
+| Constraint | Value | Rationale |
+|------------|-------|-----------|
+| Memory Limit | 256MB max | Cognitive operations are memory-light |
+| Working Memory Slots | 20 max | Prevent unbounded memory allocation |
+| CPU Time Limit | 10 seconds per operation | Cognitive ops should be fast |
+| No External State | All state within WASM sandbox | Isolation |
+| Deterministic Operations | Required for reproducibility | Debugging support |
+
+### Cognitive State Security
+
+```typescript
+// Working memory may contain sensitive task context
+// MUST be properly isolated and cleared
+
+interface CognitiveIsolation {
+  sessionId: string;
+  workingMemory: EncryptedSlot[];
+  accessKey: CryptoKey;      // Session-specific encryption key
+
+  // Clear all cognitive state
+  async clearAll(): Promise<void>;
+
+  // Export state (encrypted)
+  async export(): Promise<EncryptedState>;
+
+  // Secure deletion
+  async secureDelete(): Promise<void>;
+}
+
+// Ensure cognitive state doesn't persist unexpectedly
+async function endCognitiveSession(isolation: CognitiveIsolation): Promise<void> {
+  // Clear working memory
+  await isolation.clearAll();
+
+  // Overwrite memory regions
+  await isolation.secureDelete();
+
+  // Destroy encryption key
+  // (Key is never persisted, only in volatile memory)
+}
+```
+
+### Identified Security Risks
+
+| Risk ID | Severity | Description | Mitigation |
+|---------|----------|-------------|------------|
+| COG-SEC-001 | **HIGH** | Sensitive data in working memory | Session isolation, encrypted slots, secure clearing |
+| COG-SEC-002 | **MEDIUM** | Meta-cognitive manipulation | Bounds on interventions, audit logging |
+| COG-SEC-003 | **MEDIUM** | Attention steering abuse | Rate limiting, mode restrictions |
+| COG-SEC-004 | **LOW** | Scaffold injection | Input validation, template sanitization |
+| COG-SEC-005 | **LOW** | Cognitive state persistence | Explicit session boundaries, auto-clear |
+
+### Prompt Injection Prevention
+
+```typescript
+// Scaffolds and cognitive prompts could be vectors for prompt injection
+function sanitizeScaffoldContent(scaffold: string): string {
+  // Remove potential prompt injection patterns
+  const INJECTION_PATTERNS = [
+    /ignore\s+(previous|all)\s+instructions/gi,
+    /you\s+are\s+now\s+/gi,
+    /system\s*:\s*/gi,
+    /\[INST\]/gi,
+    /<\|system\|>/gi
+  ];
+
+  let sanitized = scaffold;
+  for (const pattern of INJECTION_PATTERNS) {
+    sanitized = sanitized.replace(pattern, '[FILTERED]');
+  }
+
+  return sanitized;
+}
+```
+
+### Rate Limiting
+
+```typescript
+const CognitiveRateLimits = {
+  'cognition/working-memory': { requestsPerMinute: 120, maxConcurrent: 10 },
+  'cognition/attention-control': { requestsPerMinute: 60, maxConcurrent: 5 },
+  'cognition/meta-monitor': { requestsPerMinute: 60, maxConcurrent: 5 },
+  'cognition/scaffold': { requestsPerMinute: 30, maxConcurrent: 3 },
+  'cognition/cognitive-load': { requestsPerMinute: 60, maxConcurrent: 5 }
+};
+```
+
 ## Risk Assessment
 
 | Risk | Likelihood | Impact | Mitigation |
