@@ -1408,17 +1408,21 @@ export class GasTownBridgePlugin extends EventEmitter implements IPlugin {
 
   private createSyncFacade(): ToolContext['bridges']['beadsSync'] {
     const sync = this.syncBridge;
+    const bd = this.bdBridge;
 
     return {
-      async pullBeads(_rig, _namespace) {
+      async pullBeads(_rig?: string, _namespace?: string) {
         if (!sync) return { synced: 0, conflicts: 0 };
-        const result = await sync.pull(_rig);
-        return { synced: result.synced, conflicts: result.conflicts };
+        // SyncBridge uses syncFromAgentDB to pull beads
+        const beads = await sync.syncFromAgentDB();
+        return { synced: beads.length, conflicts: sync.getPendingConflicts().length };
       },
-      async pushTasks(_namespace) {
-        if (!sync) return { pushed: 0, conflicts: 0 };
-        const result = await sync.push();
-        return { pushed: result.pushed, conflicts: result.conflicts };
+      async pushTasks(_namespace?: string) {
+        if (!sync || !bd) return { pushed: 0, conflicts: 0 };
+        // SyncBridge uses syncToAgentDB to push beads
+        const allBeads = await bd.listBeads({});
+        const result = await sync.syncToAgentDB(allBeads);
+        return { pushed: result.synced, conflicts: result.conflicts };
       },
     };
   }
