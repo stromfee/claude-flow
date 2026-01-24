@@ -800,16 +800,21 @@ const listCommand: Command = {
         'https://dweb.link',
       ];
 
-      type ModelType = {
+      interface ModelType {
         id: string;
         name: string;
         category: string;
         description: string;
         patterns: Array<{ id: string; description: string; confidence: number }>;
         metadata: { accuracy: number; totalUsage: number; trainedOn: string };
-      };
+      }
 
-      let registry: { models: ModelType[]; metadata: { totalPatterns: number; averageAccuracy: number } } | null = null;
+      interface RegistryType {
+        models: ModelType[];
+        metadata: { totalPatterns: number; averageAccuracy: number };
+      }
+
+      let registry: RegistryType | null = null;
 
       for (const gateway of gateways) {
         try {
@@ -819,7 +824,7 @@ const listCommand: Command = {
           });
 
           if (response.ok) {
-            registry = await response.json() as typeof registry;
+            registry = await response.json() as RegistryType;
             break;
           }
         } catch {
@@ -832,10 +837,11 @@ const listCommand: Command = {
         return { success: false, exitCode: 1 };
       }
 
-      spinner.succeed(`Found ${registry.models.length} models`);
+      const registryData = registry as RegistryType;
+      spinner.succeed(`Found ${registryData.models.length} models`);
 
       // Filter by category if specified
-      let models = registry.models;
+      let models = registryData.models;
       if (category) {
         models = models.filter(m =>
           m.category === category ||
