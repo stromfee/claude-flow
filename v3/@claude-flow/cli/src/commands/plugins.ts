@@ -644,6 +644,64 @@ const createCommand: Command = {
   },
 };
 
+// Upgrade subcommand
+const upgradeCommand: Command = {
+  name: 'upgrade',
+  description: 'Upgrade an installed plugin to a newer version',
+  options: [
+    { name: 'name', short: 'n', type: 'string', description: 'Plugin name', required: true },
+    { name: 'version', short: 'v', type: 'string', description: 'Target version (default: latest)' },
+  ],
+  examples: [
+    { command: 'claude-flow plugins upgrade -n @claude-flow/neural', description: 'Upgrade to latest' },
+    { command: 'claude-flow plugins upgrade -n @claude-flow/neural -v 3.1.0', description: 'Upgrade to specific version' },
+  ],
+  action: async (ctx: CommandContext): Promise<CommandResult> => {
+    const name = ctx.flags.name as string;
+    const version = ctx.flags.version as string;
+
+    if (!name) {
+      output.printError('Plugin name is required');
+      return { success: false, exitCode: 1 };
+    }
+
+    output.writeln();
+    const spinner = output.createSpinner({ text: `Upgrading ${name}...`, spinner: 'dots' });
+    spinner.start();
+
+    try {
+      const manager = getPluginManager();
+      await manager.initialize();
+
+      // Check if installed
+      const existing = await manager.getPlugin(name);
+      if (!existing) {
+        spinner.fail(`Plugin ${name} is not installed`);
+        return { success: false, exitCode: 1 };
+      }
+
+      const oldVersion = existing.version;
+      spinner.setText(`Upgrading ${name} from v${oldVersion}...`);
+
+      const result = await manager.upgrade(name, version);
+
+      if (!result.success) {
+        spinner.fail(`Upgrade failed: ${result.error}`);
+        return { success: false, exitCode: 1 };
+      }
+
+      const plugin = result.plugin!;
+      spinner.succeed(`Upgraded ${name}: v${oldVersion} -> v${plugin.version}`);
+
+      return { success: true, data: plugin };
+    } catch (error) {
+      spinner.fail('Upgrade failed');
+      output.printError(`Error: ${String(error)}`);
+      return { success: false, exitCode: 1 };
+    }
+  },
+};
+
 // Search subcommand - Search IPFS registry
 const searchCommand: Command = {
   name: 'search',
