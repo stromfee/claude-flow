@@ -300,6 +300,16 @@ Learn code patterns from repository history.
 ### Neutral
 - Can operate incrementally after initial index
 
+## Related ADRs
+
+| ADR | Relationship |
+|-----|--------------|
+| ADR-004: Plugin Architecture | Foundation - Defines plugin structure |
+| ADR-017: RuVector Integration | Dependency - Provides WASM packages |
+| ADR-036: Test Intelligence | Related - Code-test mapping |
+| ADR-037: Performance Optimizer | Related - Code profiling integration |
+| ADR-041: Hyperbolic Reasoning | Related - Code hierarchy embeddings |
+
 ## References
 
 - Tree-sitter: https://tree-sitter.github.io/tree-sitter/
