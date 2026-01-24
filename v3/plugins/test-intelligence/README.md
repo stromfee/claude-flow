@@ -320,6 +320,7 @@ This plugin analyzes tests but does NOT execute them directly:
 
 ### Input Validation
 
+All inputs are validated using Zod schemas:
 ```typescript
 // All inputs validated:
 - Git diffs: Maximum 1MB
@@ -327,6 +328,8 @@ This plugin analyzes tests but does NOT execute them directly:
 - History depth: 10-10000 runs
 - Max duration: 1-86400 seconds (24 hours)
 - Confidence level: 0.5-1.0
+- Test names: Alphanumeric with standard punctuation, max 500 characters
+- Framework: Enum validated against supported frameworks
 ```
 
 ### Rate Limiting
