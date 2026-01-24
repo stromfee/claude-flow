@@ -64,7 +64,8 @@ export class PerfSparseBridge implements SparseBridgeInterface {
 
     try {
       // Try to load WASM module
-      const wasmModule = await import('@claude-flow/ruvector-upstream').catch(() => null);
+      // Dynamic import of optional WASM module - type ignored since module may not exist
+      const wasmModule = await (import('@claude-flow/ruvector-upstream') as Promise<unknown>).catch(() => null);
 
       if (wasmModule) {
         // Initialize with WASM module
