@@ -43,7 +43,7 @@ import {
 // Bridge imports
 import { GtBridge, createGtBridge } from './bridges/gt-bridge.js';
 import { BdBridge, createBdBridge } from './bridges/bd-bridge.js';
-import { SyncBridge, createSyncBridge } from './bridges/sync-bridge.js';
+import { SyncBridge, createSyncBridge, type IAgentDBService, type AgentDBEntry } from './bridges/sync-bridge.js';
 
 // Formula executor
 import { FormulaExecutor, createFormulaExecutor, type IWasmLoader } from './formula/executor.js';
