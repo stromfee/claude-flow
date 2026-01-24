@@ -37,7 +37,8 @@
     "dist",
     "wasm/*/pkg/*.wasm",
     "wasm/*/pkg/*.wasm.gz",
-    "plugin.yaml"
+    "plugin.yaml",
+    "README.md"
   ],
   "scripts": {
     "build": "tsup",
