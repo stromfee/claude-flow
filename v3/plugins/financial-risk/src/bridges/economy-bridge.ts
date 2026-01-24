@@ -485,7 +485,7 @@ export class FinancialEconomyBridge implements EconomyBridge {
     return module as EconomyWasmModule;
   }
 
-  private generateSyntheticReturns(numAssets: number, numDays: number): number[] {
+  private generateSyntheticReturns(_numAssets: number, numDays: number): number[] {
     // Generate synthetic returns for demonstration
     const returns: number[] = [];
     const dailyMean = 0.0004; // ~10% annual
