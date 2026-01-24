@@ -436,7 +436,7 @@ export class AttentionBridge implements IAttentionBridge {
   ): string[] {
     const differences: string[] = [];
 
-    if (!compareClause) {
+    if (compareClause === undefined) {
       differences.push('No matching clause found in comparison document');
       return differences;
     }
