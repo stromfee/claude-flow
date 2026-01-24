@@ -1269,6 +1269,11 @@ export default {
   getWasmVersions,
   resetWasmCache,
 
+  // Lazy loading status
+  isFormulaWasmLoaded,
+  isGnnWasmLoaded,
+  getWasmLazyStats,
+
   // Performance optimization
   scheduleIdlePreload,
   getCacheStats,
