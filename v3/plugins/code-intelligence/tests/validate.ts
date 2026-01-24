@@ -100,8 +100,8 @@ async function main() {
     refactorImpactTool.handler,
     {
       changes: [
-        { file: 'src/utils.ts', type: 'modify', details: { functionName: 'formatDate' } },
-        { file: 'src/api/client.ts', type: 'modify', details: { methodName: 'fetch' } },
+        { file: 'src/utils.ts', type: 'rename', details: { oldName: 'formatDate', newName: 'formatDateISO' } },
+        { file: 'src/api/client.ts', type: 'move', details: { newPath: 'src/services/client.ts' } },
       ],
       depth: 3,
       includeTests: true,
