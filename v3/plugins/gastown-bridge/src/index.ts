@@ -1039,6 +1039,36 @@ export * from './types.js';
 // Re-export bridges
 export * from './bridges/index.js';
 
+// Re-export WASM loader
+export {
+  // Availability check
+  isWasmAvailable,
+  // Formula operations
+  loadFormulaWasm,
+  parseFormula,
+  cookFormula,
+  cookBatch,
+  // Graph operations
+  loadGnnWasm,
+  topoSort,
+  detectCycles,
+  criticalPath,
+  // Module management
+  preloadWasmModules,
+  getWasmVersions,
+  resetWasmCache,
+  // Performance timing
+  getPerformanceLog,
+  clearPerformanceLog,
+  // Types
+  type PerformanceTiming,
+  type GraphEdge,
+  type NodeWeight,
+  type CycleDetectionResult,
+  // Default export
+  default as WasmLoader,
+} from './wasm-loader.js';
+
 // Re-export security modules (explicit exports to avoid conflicts)
 export {
   // Error classes
