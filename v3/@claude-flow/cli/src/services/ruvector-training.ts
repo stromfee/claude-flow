@@ -179,6 +179,25 @@ export async function initializeTraining(config: TrainingConfig = {}): Promise<{
       // Mining not available, continue without it
     }
 
+    // Initialize SONA (optional, backward compatible)
+    if (config.useSona !== false) {
+      try {
+        const sona = await import('@ruvector/sona');
+        const sonaRank = config.sonaRank || 4;
+        // SonaEngine constructor: (dim, rank, alpha, learningRate)
+        sonaEngine = new sona.SonaEngine(dim, sonaRank, alpha, lr) as SonaEngineInstance;
+        sonaAvailable = true;
+        features.push(`SONA (${dim}-dim, rank-${sonaRank}, 624k learn/s)`);
+      } catch (sonaError) {
+        // SONA not available, continue without it (backward compatible)
+        sonaAvailable = false;
+        // Only log if explicitly requested
+        if (config.useSona === true) {
+          console.warn('SONA requested but not available:', sonaError);
+        }
+      }
+    }
+
     initialized = true;
     return { success: true, features };
   } catch (error) {
