@@ -628,7 +628,8 @@ export class GNNBridge implements IGNNBridge {
           for (let j = 0; j < outputDim; j++) {
             const featureIdx = j % featureDim;
             const contribution = (features[neighborIdx * featureDim + featureIdx] ?? 0) / neighbors.length;
-            embeddings[i * outputDim + j] += contribution * 0.5;
+            const embIdx = i * outputDim + j;
+            embeddings[embIdx] = (embeddings[embIdx] ?? 0) + contribution * 0.5;
           }
         }
       }
