@@ -879,7 +879,7 @@ const optimizeCommand: Command = {
         if (verbose) {
           output.writeln();
           output.writeln(output.bold('Optimization Recommendations'));
-          const recommendations = [];
+          const recommendations: string[] = [];
           if (patterns.length > 1000) {
             recommendations.push('- Consider pruning low-usage patterns');
           }
