@@ -573,8 +573,12 @@ const routeCommand: Command = {
       if (result.routing) {
         output.writeln();
         output.writeln(output.bold('Routing Method'));
+        const methodDisplay = result.routing.method.startsWith('semantic')
+          ? output.success(`${result.routing.method} (${result.routing.backend || 'semantic'})`)
+          : 'keyword';
         output.printList([
-          `Method: ${result.routing.method === 'semantic' ? output.success('semantic (47k routes/s)') : 'keyword'}`,
+          `Method: ${methodDisplay}`,
+          result.routing.backend ? `Backend: ${result.routing.backend}` : null,
           `Latency: ${result.routing.latencyMs.toFixed(3)}ms`,
           result.matchedPattern ? `Matched Pattern: ${result.matchedPattern}` : null,
         ].filter(Boolean) as string[]);
