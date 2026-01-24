@@ -361,7 +361,7 @@ export class FinancialEconomyBridge implements EconomyBridge {
     // Fallback: Equal weight allocation
     const weights = new Float32Array(assetCount);
     const equalWeight = 1 / assetCount;
-    for (let i = 0; i < numAssets; i++) {
+    for (let i = 0; i < assetCount; i++) {
       weights[i] = equalWeight;
     }
 
