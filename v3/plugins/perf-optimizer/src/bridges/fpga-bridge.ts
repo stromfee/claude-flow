@@ -572,8 +572,11 @@ export class PerfFpgaBridge implements FpgaBridgeInterface {
     param: string,
     min: number,
     max: number,
-    step: number
+    _step: number
   ): number {
+    // step can be used for quantization in future
+    void _step;
+
     // Find best historical value for parameter
     const relevantHistory = this.configHistory
       .filter(h => param in h.config)
