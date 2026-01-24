@@ -244,6 +244,98 @@ Suggest test cases for uncovered code.
 | Mutation optimization | 80% mutation score in 20% time | 80% in 100% time | 5x |
 | CI time reduction | 60-80% | N/A (run all tests) | Novel |
 
+## Security Considerations
+
+### Input Validation (CRITICAL)
+
+All MCP tool inputs MUST be validated using Zod schemas:
+
+```typescript
+// test/select-predictive input validation
+const SelectPredictiveSchema = z.object({
+  changes: z.object({
+    files: z.array(z.string().max(500)).max(1000).optional(),
+    gitDiff: z.string().max(1_000_000).optional(), // 1MB max diff
+    gitRef: z.string().max(100).optional()
+  }),
+  strategy: z.enum(['fast_feedback', 'high_coverage', 'risk_based', 'balanced']).default('balanced'),
+  budget: z.object({
+    maxTests: z.number().int().min(1).max(100000).optional(),
+    maxDuration: z.number().min(1).max(86400).optional(), // Max 24 hours
+    confidence: z.number().min(0.5).max(1.0).default(0.95)
+  }).optional()
+});
+
+// test/flaky-detect input validation
+const FlakyDetectSchema = z.object({
+  scope: z.object({
+    testSuite: z.string().max(500).optional(),
+    historyDepth: z.number().int().min(10).max(10000).default(100)
+  }).optional(),
+  analysis: z.array(z.enum([
+    'intermittent_failures', 'timing_sensitive', 'order_dependent',
+    'resource_contention', 'environment_sensitive'
+  ])).optional(),
+  threshold: z.number().min(0.01).max(0.5).default(0.1)
+});
+
+// test/generate-suggest input validation
+const GenerateSuggestSchema = z.object({
+  targetFunction: z.string().max(500),
+  testStyle: z.enum(['unit', 'integration', 'property_based', 'snapshot']).default('unit'),
+  framework: z.enum(['jest', 'vitest', 'pytest', 'junit', 'mocha']).default('vitest'),
+  edgeCases: z.boolean().default(true),
+  mockStrategy: z.enum(['minimal', 'full', 'none']).optional()
+});
+```
+
+### WASM Security Constraints
+
+| Constraint | Value | Rationale |
+|------------|-------|-----------|
+| Memory Limit | 512MB max | Sufficient for test analysis |
+| CPU Time Limit | 60 seconds per operation | Prevent runaway analysis |
+| No Test Execution | Analysis only, no actual test runs | Prevent arbitrary code execution |
+| No Network Access | Enforced by WASM sandbox | Prevent data exfiltration |
+| Sandboxed History | Test history isolated per project | Prevent cross-project leakage |
+
+### Test Execution Safety (CRITICAL)
+
+```typescript
+// CRITICAL: Plugin MUST NOT execute tests directly
+// Test execution happens through the user's test framework, not WASM
+
+// BAD - dangerous, could execute arbitrary code
+await wasmInstance.runTests(testFiles);
+exec(`npm test ${userSelectedTests}`);
+
+// GOOD - return test selection only, user runs tests
+const selectedTests = await wasmInstance.selectTests(changes);
+return { testsToRun: selectedTests }; // User executes via their CI/CD
+```
+
+### Identified Security Risks
+
+| Risk ID | Severity | Description | Mitigation |
+|---------|----------|-------------|------------|
+| TEST-SEC-001 | **HIGH** | Arbitrary code execution via test generation | Never auto-execute generated tests |
+| TEST-SEC-002 | **HIGH** | Command injection in test selection | No shell execution, list outputs only |
+| TEST-SEC-003 | **MEDIUM** | Test history data leakage | Per-project isolation, access controls |
+| TEST-SEC-004 | **MEDIUM** | DoS via massive test suites | Input size limits, pagination |
+| TEST-SEC-005 | **LOW** | Timing attacks on test selection | Constant-time selection algorithms |
+
+### Rate Limiting
+
+```typescript
+const TestRateLimits = {
+  'test/select-predictive': { requestsPerMinute: 60, maxConcurrent: 5 },
+  'test/flaky-detect': { requestsPerMinute: 10, maxConcurrent: 2 },
+  'test/coverage-gaps': { requestsPerMinute: 30, maxConcurrent: 3 },
+  'test/mutation-optimize': { requestsPerMinute: 5, maxConcurrent: 1 },  // Expensive
+  'test/generate-suggest': { requestsPerMinute: 30, maxConcurrent: 3 }
+};
+```
+
 ## Risk Assessment
 
 | Risk | Likelihood | Impact | Mitigation |
