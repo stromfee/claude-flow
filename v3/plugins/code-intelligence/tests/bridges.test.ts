@@ -209,9 +209,17 @@ describe('GNNBridge', () => {
       ];
       const graph = await bridge.buildCodeGraph(files, true);
 
-      const patterns = await bridge.findSimilarPatterns(graph, 'src/userService.ts', 0.5);
+      // Create a pattern graph to search for
+      const patternGraph = await bridge.buildCodeGraph(['src/userService.ts'], false);
+
+      // findSimilarPatterns expects (graph, patternGraph, threshold)
+      const patterns = await bridge.findSimilarPatterns(graph, patternGraph, 0.5);
 
       expect(Array.isArray(patterns)).toBe(true);
+      for (const pattern of patterns) {
+        expect(pattern).toHaveProperty('matchId');
+        expect(pattern).toHaveProperty('score');
+      }
     });
   });
 
