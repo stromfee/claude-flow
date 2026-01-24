@@ -312,7 +312,8 @@ export class GNNBridge implements IGNNBridge {
 
       for (const neighbor of adj[current.node] ?? []) {
         const newScore = current.score * 0.7; // Decay factor
-        if (newScore > scores[neighbor]!) {
+        const neighborScore = scores[neighbor];
+        if (neighborScore !== undefined && newScore > neighborScore) {
           scores[neighbor] = newScore;
         }
         if (!visited.has(neighbor)) {
