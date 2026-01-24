@@ -1456,35 +1456,51 @@ export class GasTownBridgePlugin extends EventEmitter implements IPlugin {
 
   private createDependencyWasmFacade(): ToolContext['bridges']['dependencyWasm'] {
     const loader = this.wasmLoader;
+    const simpleSimilarity = this.simpleSimilarity.bind(this);
 
     return {
       isInitialized: () => loader?.isInitialized() ?? false,
       async initialize() {
         if (loader) await loader.initialize();
       },
-      async resolveDependencies(beads, action) {
+      async resolveDependencies(beads: Array<{ id: string; dependencies?: string[] }>, action: 'topo_sort' | 'cycle_detect' | 'critical_path') {
         if (!loader) throw new GasTownError('WASM not initialized', GasTownErrorCode.NOT_INITIALIZED);
 
-        const nodes = beads.map(b => ({ id: b.id, dependencies: b.dependencies ?? [] }));
+        // Convert beads to step format for WasmLoaderAdapter (sync)
+        const steps = beads.map(b => ({ id: b.id, needs: b.dependencies ?? [] }));
 
         if (action === 'topo_sort') {
-          const result = wasmTopoSort(nodes);
-          return { action, sorted: result.sorted, hasCycle: result.hasCycle, cycleNodes: result.cycleNodes };
+          // Use the sync resolveStepDependencies from WasmLoaderAdapter
+          try {
+            const sorted = loader.resolveStepDependencies(steps);
+            return { action, sorted: sorted.map(s => s.id), hasCycle: false, cycleNodes: undefined };
+          } catch (e) {
+            if (e instanceof GasTownError && e.code === GasTownErrorCode.DEPENDENCY_CYCLE) {
+              const cycleNodes = (e.details as { cycleNodes?: string[] })?.cycleNodes ?? [];
+              return { action, sorted: [], hasCycle: true, cycleNodes };
+            }
+            throw e;
+          }
         } else if (action === 'cycle_detect') {
-          const result = wasmDetectCycles(nodes);
-          return { action, hasCycle: result.hasCycle, cycleNodes: result.cycleNodes };
+          const result = loader.detectCycle(steps);
+          return { action, hasCycle: result.hasCycle, cycleNodes: result.cycleSteps };
         } else {
-          const result = wasmCriticalPath(nodes, new Map());
+          // For critical path, use async WASM function
+          const nodes = beads.map(b => b.id);
+          const edges = beads.flatMap(b =>
+            (b.dependencies ?? []).map(dep => ({ from: dep, to: b.id }))
+          );
+          const result = await wasmCriticalPath(nodes, edges, []);
           return { action, criticalPath: result.path, totalDuration: result.totalDuration };
         }
       },
-      async matchPatterns(query, candidates, k, threshold) {
+      async matchPatterns(query: string, candidates: string[], k: number, threshold: number) {
         // Simplified pattern matching - in production use WASM HNSW
         const matches = candidates
           .map((candidate, index) => ({
             index,
             candidate,
-            similarity: this.simpleSimilarity(query, candidate),
+            similarity: simpleSimilarity(query, candidate),
           }))
           .filter(m => m.similarity >= threshold)
           .sort((a, b) => b.similarity - a.similarity)
@@ -1492,11 +1508,11 @@ export class GasTownBridgePlugin extends EventEmitter implements IPlugin {
 
         return matches;
       },
-      async optimizeConvoy(convoy, strategy, _constraints) {
+      async optimizeConvoy(convoy: { id: string; trackedIssues: string[] }, strategy: string, _constraints?: unknown) {
         if (!loader) throw new GasTownError('WASM not initialized', GasTownErrorCode.NOT_INITIALIZED);
 
-        const nodes = convoy.trackedIssues.map(id => ({ id, dependencies: [] }));
-        const sorted = wasmTopoSort(nodes);
+        const steps = convoy.trackedIssues.map(id => ({ id, needs: [] as string[] }));
+        const sorted = loader.resolveStepDependencies(steps);
 
         return {
           convoyId: convoy.id,
