@@ -965,6 +965,12 @@ export class FormulaExecutor extends EventEmitter {
       throw error;
     } finally {
       this.cancellations.delete(executionId);
+      // Cleanup progress emitter
+      const emitter = this.progressEmitters.get(executionId);
+      if (emitter) {
+        emitter.cancel();
+        this.progressEmitters.delete(executionId);
+      }
     }
   }
 
