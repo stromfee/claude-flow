@@ -360,6 +360,132 @@ export async function publishRegistry(req, res) {
         }
       }
 
+      case 'rate': {
+        // Rate a plugin or model (stored in GCS, no SQL)
+        const { itemId, itemType = 'plugin', rating, userId } = req.body || {};
+
+        if (!itemId || !rating || rating < 1 || rating > 5) {
+          return res.status(400).json({ error: 'itemId and rating (1-5) required' });
+        }
+
+        // Generate anonymous user ID if not provided
+        const finalUserId = userId || `anon-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+        // Store rating in GCS (JSON file per item)
+        const ratingsFile = bucket.file(`ratings/${itemType}/${itemId}.json`);
+        let ratings = { ratings: [], average: 0, count: 0 };
+
+        try {
+          const [exists] = await ratingsFile.exists();
+          if (exists) {
+            const [content] = await ratingsFile.download();
+            ratings = JSON.parse(content.toString());
+          }
+        } catch {
+          // File doesn't exist, use defaults
+        }
+
+        // Check if user already rated (prevent duplicate ratings)
+        const existingIndex = ratings.ratings.findIndex(r => r.userId === finalUserId);
+        if (existingIndex >= 0) {
+          // Update existing rating
+          ratings.ratings[existingIndex] = {
+            userId: finalUserId,
+            rating: Number(rating),
+            timestamp: new Date().toISOString(),
+          };
+        } else {
+          // Add new rating
+          ratings.ratings.push({
+            userId: finalUserId,
+            rating: Number(rating),
+            timestamp: new Date().toISOString(),
+          });
+        }
+
+        // Recalculate average
+        ratings.count = ratings.ratings.length;
+        ratings.average = ratings.ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.count;
+
+        // Save updated ratings
+        await ratingsFile.save(JSON.stringify(ratings, null, 2), {
+          contentType: 'application/json',
+        });
+
+        // Track rating event
+        await trackEvent(bucket, 'rating', itemId, { rating, itemType });
+
+        return res.json({
+          success: true,
+          itemId,
+          average: Math.round(ratings.average * 10) / 10,
+          count: ratings.count,
+        });
+      }
+
+      case 'get-ratings': {
+        // Get ratings for a plugin or model
+        const { itemId, itemType = 'plugin' } = req.query;
+
+        if (!itemId) {
+          return res.status(400).json({ error: 'itemId required' });
+        }
+
+        const ratingsFile = bucket.file(`ratings/${itemType}/${itemId}.json`);
+
+        try {
+          const [exists] = await ratingsFile.exists();
+          if (!exists) {
+            return res.json({ itemId, average: 0, count: 0, ratings: [] });
+          }
+
+          const [content] = await ratingsFile.download();
+          const ratings = JSON.parse(content.toString());
+
+          return res.json({
+            itemId,
+            average: Math.round(ratings.average * 10) / 10,
+            count: ratings.count,
+            // Don't expose individual user ratings
+          });
+        } catch {
+          return res.json({ itemId, average: 0, count: 0 });
+        }
+      }
+
+      case 'bulk-ratings': {
+        // Get ratings for multiple items at once
+        const { itemIds, itemType = 'plugin' } = req.body || req.query;
+
+        if (!itemIds || !Array.isArray(itemIds)) {
+          return res.status(400).json({ error: 'itemIds array required' });
+        }
+
+        const results = {};
+
+        for (const itemId of itemIds.slice(0, 50)) { // Limit to 50 items
+          try {
+            const ratingsFile = bucket.file(`ratings/${itemType}/${itemId}.json`);
+            const [exists] = await ratingsFile.exists();
+
+            if (exists) {
+              const [content] = await ratingsFile.download();
+              const ratings = JSON.parse(content.toString());
+              results[itemId] = {
+                average: Math.round(ratings.average * 10) / 10,
+                count: ratings.count,
+              };
+            } else {
+              results[itemId] = { average: 0, count: 0 };
+            }
+          } catch {
+            results[itemId] = { average: 0, count: 0 };
+          }
+        }
+
+        return res.json(results);
+      }
+
       default:
         return res.status(400).json({ error: `Unknown action: ${action}` });
     }
