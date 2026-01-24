@@ -342,7 +342,7 @@ async function clinicalPathwaysHandler(
       return errorResult(`Invalid input: ${validation.error.message}`);
     }
 
-    const { primaryDiagnosis, patientHistory, constraints } = validation.data;
+    const { primaryDiagnosis, constraints } = validation.data;
 
     // Initialize GNN bridge
     const gnnBridge = context?.bridge?.gnn ?? new HealthcareGNNBridge();
