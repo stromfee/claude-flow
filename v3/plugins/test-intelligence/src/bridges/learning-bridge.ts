@@ -72,7 +72,8 @@ export class TestLearningBridge implements LearningBridgeInterface {
 
     try {
       // Try to load WASM module
-      const wasmModule = await import('@claude-flow/ruvector-upstream/learning').catch(() => null);
+      // Dynamic import of optional WASM module
+      const wasmModule = await import('@claude-flow/ruvector-upstream').catch(() => null);
 
       if (wasmModule) {
         // Initialize with WASM module
