@@ -531,8 +531,11 @@ export class PerfFpgaBridge implements FpgaBridgeInterface {
   private gridSearch(
     searchSpace: Record<string, { min: number; max: number; step: number }>,
     objective: string,
-    constraints: Record<string, number>
+    _constraints: Record<string, number>
   ): Record<string, unknown> {
+    // constraints used for constraint satisfaction in advanced implementation
+    void _constraints;
+
     const bestConfig: Record<string, unknown> = {};
     let bestScore = -Infinity;
 
