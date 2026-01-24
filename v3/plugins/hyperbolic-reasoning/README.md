@@ -294,6 +294,14 @@ The plugin supports learning optimal curvature per hierarchy:
 4. **Taxonomic Classification**: Improved classification with hierarchical awareness
 5. **Concept Entailment**: Determine semantic relationships between concepts
 
+## Related Plugins
+
+| Plugin | Description | Synergy |
+|--------|-------------|---------|
+| [@claude-flow/plugin-neural-coordination](https://www.npmjs.com/package/@claude-flow/plugin-neural-coordination) | Multi-agent coordination | Hierarchical embeddings enable efficient agent organization structures |
+| [@claude-flow/plugin-cognitive-kernel](https://www.npmjs.com/package/@claude-flow/plugin-cognitive-kernel) | Cognitive augmentation | Hyperbolic memory organization for improved episodic retrieval |
+| [@claude-flow/plugin-quantum-optimizer](https://www.npmjs.com/package/@claude-flow/plugin-quantum-optimizer) | Quantum-inspired optimization | Optimizes hierarchical constraint satisfaction and tree operations |
+
 ## License
 
 MIT
