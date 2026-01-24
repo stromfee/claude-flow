@@ -25,7 +25,7 @@ npm install @claude-flow/plugin-healthcare-clinical
 ### CLI
 
 ```bash
-npx @claude-flow/cli plugins install healthcare-clinical
+npx claude-flow plugins install --name @claude-flow/plugin-healthcare-clinical
 ```
 
 ## Quick Start
