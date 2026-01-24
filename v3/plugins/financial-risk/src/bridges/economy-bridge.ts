@@ -444,7 +444,7 @@ export class FinancialEconomyBridge implements EconomyBridge {
   generateCalculationProof(
     input: unknown,
     output: unknown,
-    modelVersion: string = '1.0.0'
+    _modelVersion: string = '1.0.0'
   ): RiskCalculationProof {
     const inputHash = this.hashObject(input);
     const outputHash = this.hashObject(output);
