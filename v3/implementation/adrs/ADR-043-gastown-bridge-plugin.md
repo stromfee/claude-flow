@@ -123,42 +123,52 @@ Create `@claude-flow/plugin-gastown-bridge` with a **WASM-centric hybrid archite
 }
 ```
 
-### MCP Tools (15 Tools)
+### MCP Tools (20 Tools)
 
-#### Beads Integration (5 tools)
+#### Beads Integration (5 tools) - CLI Bridge
 
-| Tool | Description | Parameters |
-|------|-------------|------------|
-| `gt_beads_create` | Create a bead/issue in Beads | `title`, `description`, `priority`, `labels[]`, `parent?` |
-| `gt_beads_ready` | List ready beads (no blockers) | `rig?`, `limit?`, `labels[]?` |
-| `gt_beads_show` | Show bead details | `bead_id` |
-| `gt_beads_dep` | Manage bead dependencies | `action: add|remove`, `child`, `parent` |
-| `gt_beads_sync` | Sync beads with AgentDB | `direction: pull|push|both`, `rig?` |
+| Tool | Description | Parameters | Layer |
+|------|-------------|------------|-------|
+| `gt_beads_create` | Create a bead/issue in Beads | `title`, `description`, `priority`, `labels[]`, `parent?` | CLI |
+| `gt_beads_ready` | List ready beads (no blockers) | `rig?`, `limit?`, `labels[]?` | CLI |
+| `gt_beads_show` | Show bead details | `bead_id` | CLI |
+| `gt_beads_dep` | Manage bead dependencies | `action: add|remove`, `child`, `parent` | CLI |
+| `gt_beads_sync` | Sync beads with AgentDB | `direction: pull|push|both`, `rig?` | CLI+WASM |
 
-#### Convoy Operations (3 tools)
+#### Convoy Operations (3 tools) - CLI Bridge
 
-| Tool | Description | Parameters |
-|------|-------------|------------|
-| `gt_convoy_create` | Create a convoy (work order) | `name`, `issues[]`, `description?` |
-| `gt_convoy_status` | Check convoy status | `convoy_id?` (all if omitted) |
-| `gt_convoy_track` | Add/remove issues from convoy | `convoy_id`, `action: add|remove`, `issues[]` |
+| Tool | Description | Parameters | Layer |
+|------|-------------|------------|-------|
+| `gt_convoy_create` | Create a convoy (work order) | `name`, `issues[]`, `description?` | CLI |
+| `gt_convoy_status` | Check convoy status | `convoy_id?` (all if omitted) | CLI |
+| `gt_convoy_track` | Add/remove issues from convoy | `convoy_id`, `action: add|remove`, `issues[]` | CLI |
 
-#### Formula Engine (4 tools)
+#### Formula Engine (4 tools) - WASM Accelerated
 
-| Tool | Description | Parameters |
-|------|-------------|------------|
-| `gt_formula_list` | List available formulas | `type?: convoy|workflow|expansion|aspect` |
-| `gt_formula_cook` | Cook formula into protomolecule | `formula`, `vars: Record<string, string>` |
-| `gt_formula_execute` | Execute a formula | `formula`, `vars`, `target_agent?` |
-| `gt_formula_create` | Create custom formula | `name`, `type`, `steps[]`, `vars?` |
+| Tool | Description | Parameters | Layer |
+|------|-------------|------------|-------|
+| `gt_formula_list` | List available formulas | `type?: convoy|workflow|expansion|aspect` | CLI |
+| `gt_formula_cook` | Cook formula into protomolecule (352x faster) | `formula`, `vars: Record<string, string>` | **WASM** |
+| `gt_formula_execute` | Execute a formula | `formula`, `vars`, `target_agent?` | CLI+WASM |
+| `gt_formula_create` | Create custom formula | `name`, `type`, `steps[]`, `vars?` | CLI |
 
-#### Orchestration (3 tools)
+#### Orchestration (3 tools) - CLI Bridge
 
-| Tool | Description | Parameters |
-|------|-------------|------------|
-| `gt_sling` | Sling work to an agent | `bead_id`, `target: polecat|crew|mayor`, `formula?` |
-| `gt_agents` | List Gas Town agents | `rig?`, `role?: mayor|polecat|refinery|witness|deacon|dog|crew` |
-| `gt_mail` | Send/receive Gas Town mail | `action: send|read|list`, `to?`, `subject?`, `body?` |
+| Tool | Description | Parameters | Layer |
+|------|-------------|------------|-------|
+| `gt_sling` | Sling work to an agent | `bead_id`, `target: polecat|crew|mayor`, `formula?` | CLI |
+| `gt_agents` | List Gas Town agents | `rig?`, `role?: mayor|polecat|refinery|witness|deacon|dog|crew` | CLI |
+| `gt_mail` | Send/receive Gas Town mail | `action: send|read|list`, `to?`, `subject?`, `body?` | CLI |
+
+#### WASM Computation (5 tools) - Pure WASM
+
+| Tool | Description | Parameters | Performance |
+|------|-------------|------------|-------------|
+| `gt_wasm_parse_formula` | Parse TOML formula to AST | `content: string` | 352x vs JS |
+| `gt_wasm_resolve_deps` | Resolve dependency graph | `beads: Bead[]`, `action?: topo_sort\|critical_path\|cycle_detect` | 150x vs JS |
+| `gt_wasm_cook_batch` | Batch cook multiple formulas | `formulas: Formula[]`, `vars: Record<string, string>[]` | 352x vs JS |
+| `gt_wasm_match_pattern` | Find similar formulas/beads | `query: string`, `candidates: string[]`, `k?: number` | 150x-12500x |
+| `gt_wasm_optimize_convoy` | Optimize convoy execution order | `convoy_id`, `strategy?: parallel\|serial\|hybrid` | 150x vs JS |
 
 ### TypeScript Implementation
 
