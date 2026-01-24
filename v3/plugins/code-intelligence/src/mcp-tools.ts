@@ -976,10 +976,10 @@ function generateMigrationSteps(
 }
 
 async function learnPatternsFromHistory(
-  scope: { gitRange?: string; authors?: string[]; paths?: string[] },
-  patternTypes: string[],
-  minOccurrences: number,
-  context: ToolContext
+  _scope: { gitRange?: string; authors?: string[]; paths?: string[] },
+  _patternTypes: string[],
+  _minOccurrences: number,
+  _context: ToolContext
 ): Promise<LearnedPattern[]> {
   // Simplified - in production would analyze git history
   return [
