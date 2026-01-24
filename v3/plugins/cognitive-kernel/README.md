@@ -268,6 +268,14 @@ interface CognitiveKernelConfig {
 4. **Error Prevention**: Meta-cognitive monitoring catches reasoning errors before output
 5. **Context Management**: Intelligent attention control for managing long contexts
 
+## Related Plugins
+
+| Plugin | Description | Synergy |
+|--------|-------------|---------|
+| [@claude-flow/plugin-neural-coordination](https://www.npmjs.com/package/@claude-flow/plugin-neural-coordination) | Multi-agent coordination | Cognitive kernel provides enhanced reasoning for coordinated agents |
+| [@claude-flow/plugin-hyperbolic-reasoning](https://www.npmjs.com/package/@claude-flow/plugin-hyperbolic-reasoning) | Hierarchical reasoning | Combines hierarchical structure with cognitive scaffolding |
+| [@claude-flow/plugin-quantum-optimizer](https://www.npmjs.com/package/@claude-flow/plugin-quantum-optimizer) | Quantum-inspired optimization | Optimizes cognitive resource allocation and attention scheduling |
+
 ## Architecture
 
 ```
