@@ -329,14 +329,15 @@ class JsFallbackWasmLoader implements IWasmLoader {
       }
 
       // Return immutable formula
-      return {
+      const formula: Formula = {
         name,
         description,
         type,
         version,
-        steps: steps as readonly Step[],
+        steps: steps as Step[],
         vars,
       };
+      return formula;
     } catch (error) {
       throw FormulaError.parseFailed('js-parse', 'Failed to parse formula content', error as Error);
     }
