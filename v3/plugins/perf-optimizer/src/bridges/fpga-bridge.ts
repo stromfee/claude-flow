@@ -358,8 +358,11 @@ export class PerfFpgaBridge implements FpgaBridgeInterface {
 
   private predictImprovement(
     parameters: ConfigParameter[],
-    workload: WorkloadProfile
+    _workload: WorkloadProfile
   ): { latency: number; throughput: number; cost: number } {
+    // workload can be used for workload-specific predictions in future
+    void _workload;
+
     let latencyImprovement = 0;
     let throughputImprovement = 0;
     let costImpact = 0;
