@@ -603,8 +603,13 @@ function getCodeDisplay(code: string, ontology: string): string {
   return displays[code] ?? `${ontology.toUpperCase()} Code: ${code}`;
 }
 
-function generateOntologyResults(code: string, ontology: string, direction: string, depth: number) {
-  const results = [];
+function generateOntologyResults(code: string, ontology: 'icd10' | 'snomed' | 'loinc' | 'rxnorm', _direction: string, depth: number) {
+  const results: Array<{
+    code: string;
+    display: string;
+    ontology: 'icd10' | 'snomed' | 'loinc' | 'rxnorm';
+    depth: number;
+  }> = [];
   const count = Math.min(depth * 3, 10);
 
   for (let i = 0; i < count; i++) {
