@@ -66,7 +66,7 @@ type EdgeType = 'depends_on' | 'blocks' | 'triggers';
  * DAG Bridge Implementation
  */
 export class DAGBridge implements IDAGBridge {
-  private wasmModule: DAGWasmModule | null = null;
+  private _wasmModule: DAGWasmModule | null = null;
   private initialized = false;
 
   /**
