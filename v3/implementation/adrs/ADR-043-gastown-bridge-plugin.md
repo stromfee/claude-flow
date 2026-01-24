@@ -560,28 +560,47 @@ export interface GasTownConfig {
 
 ## Implementation Phases
 
-### Phase 1: CLI Bridge (Week 1)
-- Implement `gt` and `bd` CLI wrappers
-- Create 5 Beads MCP tools
+### Phase 1: CLI Bridge Foundation (Week 1)
+- Implement `gt` and `bd` CLI wrappers with proper escaping
+- Create 5 Beads MCP tools (CLI-based)
 - Basic convoy status tool
 - Tests for CLI integration
+- Security: input sanitization, path validation
 
-### Phase 2: Formula Engine (Week 2)
-- Native TOML formula parser
-- Variable substitution (cooking)
-- Molecule generation from formulas
-- 4 Formula MCP tools
+### Phase 2: WASM Core Development (Week 2-3)
+- **gastown-formula-wasm** Rust crate:
+  - TOML parser using `toml` crate
+  - Variable substitution engine
+  - Molecule generation logic
+  - wasm-bindgen exports
+- **ruvector-gnn-wasm** integration:
+  - DAG construction from beads
+  - Topological sort for execution order
+  - Cycle detection for dependency validation
+  - Critical path analysis for convoys
+- WASM loader with caching in TypeScript
+- Benchmark suite: WASM vs JS comparison
 
-### Phase 3: Sync & Convoys (Week 3)
-- Beads-AgentDB bidirectional sync
+### Phase 3: WASM Tools Integration (Week 4)
+- 5 WASM-accelerated MCP tools
+- Hybrid execution: CLI for I/O, WASM for computation
+- Pattern matching via `micro-hnsw-wasm`
+- Formula similarity search
+- Batch cooking optimization
+
+### Phase 4: Sync & Convoys (Week 5)
+- Beads-AgentDB bidirectional sync with WASM graph analysis
 - Convoy tracking with Claude Flow tasks
 - 3 Convoy MCP tools
 - 3 Orchestration MCP tools
+- WASM-based convoy optimization
 
-### Phase 4: GUPP Adapter (Week 4)
+### Phase 5: GUPP Adapter & Polish (Week 6)
 - Translate GUPP hooks to session persistence
 - Automatic work continuation on restart
 - Integration with Claude Flow daemon
+- Performance profiling and optimization
+- Documentation and examples
 
 ## Dependencies
 
