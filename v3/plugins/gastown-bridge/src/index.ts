@@ -1039,6 +1039,9 @@ export * from './types.js';
 // Re-export bridges
 export * from './bridges/index.js';
 
+// Re-export convoy module
+export * from './convoy/index.js';
+
 // Re-export WASM loader
 export {
   // Availability check
