@@ -311,6 +311,16 @@ Execution History --> SONA Learning --> RL Policy
 ### Neutral
 - Can fallback to full test runs when uncertain
 
+## Related ADRs
+
+| ADR | Relationship |
+|-----|--------------|
+| ADR-004: Plugin Architecture | Foundation - Defines plugin structure |
+| ADR-017: RuVector Integration | Dependency - Provides WASM packages |
+| ADR-035: Code Intelligence | Related - Code-test mapping |
+| ADR-037: Performance Optimizer | Related - Test performance analysis |
+| ADR-040: Quantum Optimizer | Related - Test selection optimization |
+
 ## References
 
 - Google Test Selection: https://testing.googleblog.com/2019/11/debugging-test-selection.html
