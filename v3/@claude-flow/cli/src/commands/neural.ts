@@ -1417,8 +1417,15 @@ const benchmarkCommand: Command = {
       spinner.start();
       spinner.setText('Benchmarking MicroLoRA adaptation...');
 
+      // Load WASM file directly (Node.js compatible)
+      const fs = await import('fs');
+      const { createRequire } = await import('module');
+      const require = createRequire(import.meta.url);
+      const wasmPath = require.resolve('@ruvector/learning-wasm/ruvector_learning_wasm_bg.wasm');
+      const wasmBuffer = fs.readFileSync(wasmPath);
+
       const learningWasm = await import('@ruvector/learning-wasm');
-      await learningWasm.default();
+      learningWasm.initSync({ module: wasmBuffer });
 
       const lora = new learningWasm.WasmMicroLoRA(dim, 0.1, 0.01);
       const gradient = new Float32Array(dim);
