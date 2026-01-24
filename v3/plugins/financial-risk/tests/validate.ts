@@ -73,9 +73,9 @@ async function main() {
     anomalyDetectTool.handler,
     {
       transactions: [
-        { id: 'tx1', amount: 10000, timestamp: new Date().toISOString(), accountId: 'acc1' },
-        { id: 'tx2', amount: 150000, timestamp: new Date().toISOString(), accountId: 'acc2' },
-        { id: 'tx3', amount: 500, timestamp: new Date().toISOString(), accountId: 'acc1' },
+        { id: '550e8400-e29b-41d4-a716-446655440001', amount: 10000, timestamp: new Date().toISOString(), parties: ['acc1', 'merchant1'] },
+        { id: '550e8400-e29b-41d4-a716-446655440002', amount: 150000, timestamp: new Date().toISOString(), parties: ['acc2', 'merchant2'] },
+        { id: '550e8400-e29b-41d4-a716-446655440003', amount: 500, timestamp: new Date().toISOString(), parties: ['acc1', 'merchant3'] },
       ],
       sensitivity: 0.7,
       context: 'fraud',
