@@ -644,7 +644,7 @@ const exportCommand: Command = {
           { name: 'Ed25519' },
           true,
           ['sign', 'verify']
-        ) as CryptoKeyPair;
+        ) as { privateKey: CryptoKey; publicKey: CryptoKey };
 
         const exportBytes = new TextEncoder().encode(JSON.stringify(exportData));
         const signatureBytes = await crypto.subtle.sign('Ed25519', keyPair.privateKey, exportBytes);
