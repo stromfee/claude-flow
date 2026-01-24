@@ -25,7 +25,7 @@ npm install @claude-flow/plugin-legal-contracts
 ### CLI
 
 ```bash
-npx @claude-flow/cli plugins install legal-contracts
+npx claude-flow plugins install --name @claude-flow/plugin-legal-contracts
 ```
 
 ## Quick Start
