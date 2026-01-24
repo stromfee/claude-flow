@@ -477,7 +477,8 @@ const AGENT_PATTERNS: Record<string, string[]> = {
   '.scss': ['coder', 'designer'],
 };
 
-const TASK_PATTERNS: Record<string, { agents: string[]; confidence: number }> = {
+// Keyword patterns for fallback routing (when semantic routing doesn't match)
+const KEYWORD_PATTERNS: Record<string, { agents: string[]; confidence: number }> = {
   'authentication': { agents: ['security-architect', 'coder', 'tester'], confidence: 0.9 },
   'auth': { agents: ['security-architect', 'coder', 'tester'], confidence: 0.85 },
   'api': { agents: ['architect', 'coder', 'tester'], confidence: 0.85 },
