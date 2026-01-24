@@ -809,9 +809,8 @@ export class GasTownBridgePlugin extends EventEmitter implements IPlugin {
         this.convoyTracker = null;
       }
 
-      // Cleanup sync bridge
+      // Cleanup sync bridge (SyncBridge has no dispose method)
       if (this.syncBridge) {
-        await this.syncBridge.dispose();
         this.syncBridge = null;
       }
 
