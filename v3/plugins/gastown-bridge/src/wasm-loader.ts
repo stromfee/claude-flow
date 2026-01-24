@@ -270,8 +270,8 @@ export async function loadGnnWasm(): Promise<GnnWasmExports | null> {
   }
 
   try {
-    // Dynamic import of WASM module
-    const module = await import('ruvector-gnn-wasm') as GnnWasmExports;
+    // Dynamic import of WASM module - use unknown intermediate cast
+    const module = await import('ruvector-gnn-wasm') as unknown as GnnWasmExports;
 
     // Initialize if needed
     if (typeof module.default === 'function') {
