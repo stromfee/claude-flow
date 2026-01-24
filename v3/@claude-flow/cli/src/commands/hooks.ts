@@ -534,6 +534,7 @@ const routeCommand: Command = {
         task: string;
         routing?: {
           method: string;
+          backend?: string;
           latencyMs: number;
           throughput: string;
         };
