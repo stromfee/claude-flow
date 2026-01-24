@@ -39,7 +39,7 @@ interface HNSWWasmModule {
   delete_vector(indexPtr: number, id: number): boolean;
   count(indexPtr: number): number;
   free_index(indexPtr: number): void;
-  memory: WebAssembly.Memory;
+  memory: { buffer: ArrayBuffer };
 }
 
 /**
