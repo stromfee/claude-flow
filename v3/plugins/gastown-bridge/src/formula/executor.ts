@@ -267,17 +267,17 @@ class JsFallbackWasmLoader implements IWasmLoader {
     // In production, use a proper TOML parser
     try {
       const lines = content.split('\n');
-      const result: Partial<Formula> = {
-        name: 'parsed-formula',
-        description: '',
-        type: 'workflow',
-        version: 1,
-        steps: [],
-        vars: {},
-      };
+
+      // Use mutable objects during parsing, then cast to readonly
+      let name = 'parsed-formula';
+      let description = '';
+      let type: FormulaType = 'workflow';
+      let version = 1;
+      const steps: Array<{ id: string; title: string; description: string; needs?: string[] }> = [];
+      const vars: Record<string, Var> = {};
 
       let currentSection = '';
-      let currentStep: Partial<Step> | null = null;
+      let currentStep: { id: string; title: string; description: string; needs?: string[] } | null = null;
 
       for (const line of lines) {
         const trimmed = line.trim();
@@ -288,7 +288,7 @@ class JsFallbackWasmLoader implements IWasmLoader {
         // Section headers
         if (trimmed.startsWith('[')) {
           if (currentStep && currentStep.id) {
-            result.steps?.push(currentStep as Step);
+            steps.push(currentStep);
           }
 
           const sectionMatch = trimmed.match(/\[(\w+)(?:\.(\w+))?\]/);
@@ -309,10 +309,10 @@ class JsFallbackWasmLoader implements IWasmLoader {
           const [, key, value] = kvMatch;
 
           if (currentSection === 'formula') {
-            if (key === 'name') result.name = value;
-            else if (key === 'description') result.description = value;
-            else if (key === 'type') result.type = value as FormulaType;
-            else if (key === 'version') result.version = parseInt(value, 10);
+            if (key === 'name') name = value;
+            else if (key === 'description') description = value;
+            else if (key === 'type') type = value as FormulaType;
+            else if (key === 'version') version = parseInt(value, 10);
           } else if (currentStep) {
             if (key === 'title') currentStep.title = value;
             else if (key === 'description') currentStep.description = value;
@@ -325,10 +325,18 @@ class JsFallbackWasmLoader implements IWasmLoader {
 
       // Add last step
       if (currentStep && currentStep.id) {
-        result.steps?.push(currentStep as Step);
+        steps.push(currentStep);
       }
 
-      return result as Formula;
+      // Return immutable formula
+      return {
+        name,
+        description,
+        type,
+        version,
+        steps: steps as readonly Step[],
+        vars,
+      };
     } catch (error) {
       throw FormulaError.parseFailed('js-parse', 'Failed to parse formula content', error as Error);
     }
