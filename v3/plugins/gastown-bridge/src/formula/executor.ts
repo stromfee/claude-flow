@@ -42,6 +42,119 @@ import {
   withArenaSync,
 } from '../memory/index.js';
 
+import {
+  LRUCache,
+  BatchDeduplicator,
+  DebouncedEmitter,
+} from '../cache.js';
+
+// ============================================================================
+// Performance Caches & Deduplication
+// ============================================================================
+
+/** Step result cache for memoization */
+const stepResultCache = new LRUCache<string, StepResult>({
+  maxEntries: 500,
+  ttlMs: 5 * 60 * 1000, // 5 min TTL
+});
+
+/** Formula cook cache */
+const cookCache = new LRUCache<string, CookedFormula>({
+  maxEntries: 200,
+  ttlMs: 10 * 60 * 1000, // 10 min TTL
+});
+
+/** Deduplicator for concurrent cook requests */
+const cookDedup = new BatchDeduplicator<CookedFormula>();
+
+/** Deduplicator for concurrent formula fetch requests */
+const fetchDedup = new BatchDeduplicator<Formula>();
+
+/**
+ * Work stealing queue for parallel execution
+ */
+interface WorkItem {
+  step: Step;
+  context: StepContext;
+  options: ExecuteOptions;
+  priority: number;
+}
+
+/**
+ * Work stealing queue for load balancing across parallel workers
+ */
+class WorkStealingQueue {
+  private queues: WorkItem[][] = [];
+  private nextQueueId = 0;
+
+  constructor(private readonly numWorkers: number) {
+    for (let i = 0; i < numWorkers; i++) {
+      this.queues.push([]);
+    }
+  }
+
+  /** Enqueue work to least-loaded queue */
+  enqueue(item: WorkItem): void {
+    // Find queue with least items
+    let minQueue = 0;
+    let minLen = this.queues[0]?.length ?? 0;
+    for (let i = 1; i < this.queues.length; i++) {
+      const len = this.queues[i]?.length ?? 0;
+      if (len < minLen) {
+        minLen = len;
+        minQueue = i;
+      }
+    }
+    this.queues[minQueue]?.push(item);
+  }
+
+  /** Dequeue from own queue or steal from others */
+  dequeue(workerId: number): WorkItem | undefined {
+    // Try own queue first
+    const ownQueue = this.queues[workerId];
+    if (ownQueue && ownQueue.length > 0) {
+      return ownQueue.shift();
+    }
+
+    // Try to steal from other queues (round-robin)
+    for (let i = 1; i < this.queues.length; i++) {
+      const victimId = (workerId + i) % this.queues.length;
+      const victimQueue = this.queues[victimId];
+      if (victimQueue && victimQueue.length > 1) {
+        // Steal from the back (LIFO stealing)
+        return victimQueue.pop();
+      }
+    }
+
+    return undefined;
+  }
+
+  /** Check if all queues are empty */
+  isEmpty(): boolean {
+    return this.queues.every(q => q.length === 0);
+  }
+
+  /** Get total pending items */
+  get size(): number {
+    return this.queues.reduce((sum, q) => sum + q.length, 0);
+  }
+}
+
+/**
+ * Hash function for cache keys (FNV-1a)
+ */
+function hashKey(parts: string[]): string {
+  let hash = 2166136261;
+  for (const part of parts) {
+    for (let i = 0; i < part.length; i++) {
+      hash ^= part.charCodeAt(i);
+      hash = (hash * 16777619) >>> 0;
+    }
+    hash ^= 0xff; // separator
+  }
+  return hash.toString(36);
+}
+
 // ============================================================================
 // Types
 // ============================================================================
