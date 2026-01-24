@@ -643,13 +643,13 @@ export const learnPatternsTool: MCPTool<
 // ============================================================================
 
 async function performSemanticSearch(
-  query: string,
-  paths: string[],
-  searchType: string,
+  _query: string,
+  _paths: string[],
+  _searchType: string,
   topK: number,
-  languages: Language[] | undefined,
-  excludeTests: boolean,
-  context: ToolContext
+  _languages: string[] | undefined,
+  _excludeTests: boolean,
+  _context: ToolContext
 ): Promise<CodeSearchResult[]> {
   // Simplified implementation
   const results: CodeSearchResult[] = [];
