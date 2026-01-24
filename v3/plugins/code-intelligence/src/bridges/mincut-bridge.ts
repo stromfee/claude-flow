@@ -78,12 +78,12 @@ export class MinCutBridge implements IMinCutBridge {
 
     try {
       // Dynamic import of WASM module
-      this.wasmModule = await this.loadWasmModule();
+      this._wasmModule = await this.loadWasmModule();
       this.initialized = true;
-    } catch (error) {
+    } catch {
       // Fallback to pure JS implementation
       console.warn('WASM MinCut module not available, using JS fallback');
-      this.wasmModule = null;
+      this._wasmModule = null;
       this.initialized = true;
     }
   }
