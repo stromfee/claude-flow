@@ -1273,6 +1273,36 @@ Install these optional plugins to extend Claude Flow capabilities:
 | **@claude-flow/plugin-prime-radiant** | 0.1.4 | Mathematical AI interpretability with 6 engines: sheaf cohomology, spectral analysis, causal inference, quantum topology, category theory, HoTT proofs. | `npm install @claude-flow/plugin-prime-radiant` |
 | **@claude-flow/plugin-gastown-bridge** | 0.1.0 | Gas Town orchestrator integration with WASM-accelerated formula parsing (352x faster), Beads sync, convoy management, and graph analysis. 20 MCP tools. | `npx claude-flow@latest plugins install -n @claude-flow/plugin-gastown-bridge` |
 
+#### 🤝 Claude Code Integration Plugins
+
+| Plugin | Version | Description | Install Command |
+|--------|---------|-------------|-----------------|
+| **@claude-flow/teammate-plugin** | 1.0.0-alpha.1 | Native TeammateTool integration for Claude Code v2.1.19+. Multi-agent team orchestration with plan approval workflows, delegation, messaging, and BMSSP-optimized topology routing. 21 MCP tools. | `npx @claude-flow/cli@latest plugins install teammate-plugin` |
+
+**Teammate Plugin Features:**
+- Native bridge to Claude Code's TeammateTool (v2.1.19+)
+- Team management: hierarchical, mesh, flat topologies
+- Plan approval workflows with multi-voter consensus
+- Teammate delegation and permission inheritance
+- Direct and broadcast messaging with mailbox polling
+- Session memory persistence across terminal sessions
+- Remote sync to Claude.ai (experimental)
+- BMSSP WASM acceleration for topology optimization (10-15x faster)
+- Semantic routing with neural embeddings for task-to-teammate matching
+- 21 MCP tools including 5 BMSSP-optimized operations
+- Rate limiting, circuit breaker, and health checks built-in
+
+```bash
+# Install via CLI
+npx @claude-flow/cli@latest plugins install teammate-plugin
+
+# Or via npm
+npm install @claude-flow/teammate-plugin
+
+# Verify Claude Code version (requires >= 2.1.19)
+claude --version
+```
+
 #### 🏥 Domain-Specific Plugins
 
 | Plugin | Version | Description | Install Command |
