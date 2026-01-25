@@ -2,7 +2,24 @@
 # IPFS Registry Update Script for teammate-plugin
 # Uses Pinata API to upload updated plugin registry
 
-PINATA_JWT="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySW5mb3JtYXRpb24iOnsiaWQiOiIzNWE4MDE3Zi01N2IzLTRlYzUtOGIxMS04MDA5NDhlZjFmODQiLCJlbWFpbCI6InJ1dkBydXYubmV0IiwiZW1haWxfdmVyaWZpZWQiOnRydWUsInBpbl9wb2xpY3kiOnsicmVnaW9ucyI6W3siZGVzaXJlZFJlcGxpY2F0aW9uQ291bnQiOjEsImlkIjoiRlJBMSJ9LHsiZGVzaXJlZFJlcGxpY2F0aW9uQ291bnQiOjEsImlkIjoiTllDMSJ9XSwidmVyc2lvbiI6MX0sIm1mYV9lbmFibGVkIjpmYWxzZSwic3RhdHVzIjoiQUNUSVZFIn0sImF1dGhlbnRpY2F0aW9uVHlwZSI6InNjb3BlZEtleSIsInNjb3BlZEtleUtleSI6ImQ5MGEwNTU0N2JjYzBiNzkwODI1Iiwic2NvcGVkS2V5U2VjcmV0IjoiMzVlMTUyNjRiZDY2YmU2YTA3NTFjNWMzMzY5MzQ3M2Y0MzE1NTJmNmQ1ZDQ5MGQ4NWVkODBhMjAyOGU2ODg2MCIsImV4cCI6MTgwMDgwMzUxNn0.P8yUavU2zgrGzTy_cUAvpNZg-S2lopH_SduLyUlYHtI"
+# Load credentials from .env file
+ENV_FILE="${1:-/workspaces/claude-flow/.env}"
+
+if [ ! -f "$ENV_FILE" ]; then
+  echo "ERROR: .env file not found at $ENV_FILE"
+  echo "Usage: $0 [path-to-env-file]"
+  exit 1
+fi
+
+# Source PINATA_API_JWT from .env (grep and extract)
+PINATA_JWT=$(grep -E "^PINATA_API_JWT=" "$ENV_FILE" | cut -d'=' -f2-)
+
+if [ -z "$PINATA_JWT" ]; then
+  echo "ERROR: PINATA_API_JWT not found in $ENV_FILE"
+  exit 1
+fi
+
+echo "Loaded Pinata credentials from $ENV_FILE"
 
 # Create the updated registry JSON
 cat > /tmp/plugin-registry.json << 'EOF'
