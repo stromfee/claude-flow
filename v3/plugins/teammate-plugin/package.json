@@ -55,7 +55,7 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/ruvnet/claude-flow.git",
-    "directory": "v3/@claude-flow/teammate-plugin"
+    "directory": "v3/plugins/teammate-plugin"
   },
   "bugs": {
     "url": "https://github.com/ruvnet/claude-flow/issues"
