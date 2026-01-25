@@ -1,7 +1,7 @@
 /**
  * MCP Tools for TeammateTool Integration
  *
- * Exposes 12 MCP tools for multi-agent orchestration via Claude Code.
+ * Exposes 16 MCP tools for multi-agent orchestration via Claude Code.
  *
  * @module @claude-flow/teammate-plugin/mcp
  * @version 1.0.0-alpha.1
@@ -16,6 +16,46 @@ import type {
   TeleportTarget,
   MessageType,
 } from './types.js';
+
+// ============================================================================
+// Security Constants
+// ============================================================================
+
+/** Maximum parameter string length */
+const MAX_PARAM_LENGTH = 10000;
+
+/** Maximum array items in parameters */
+const MAX_ARRAY_ITEMS = 100;
+
+// ============================================================================
+// Input Validation
+// ============================================================================
+
+/**
+ * Validate string parameter
+ */
+function validateStringParam(value: unknown, name: string, maxLength = MAX_PARAM_LENGTH): string {
+  if (typeof value !== 'string') {
+    throw new Error(`Parameter '${name}' must be a string`);
+  }
+  if (value.length > maxLength) {
+    throw new Error(`Parameter '${name}' exceeds maximum length of ${maxLength}`);
+  }
+  return value;
+}
+
+/**
+ * Validate array parameter
+ */
+function validateArrayParam<T>(value: unknown, name: string, maxItems = MAX_ARRAY_ITEMS): T[] {
+  if (!Array.isArray(value)) {
+    throw new Error(`Parameter '${name}' must be an array`);
+  }
+  if (value.length > maxItems) {
+    throw new Error(`Parameter '${name}' exceeds maximum of ${maxItems} items`);
+  }
+  return value as T[];
+}
 
 // ============================================================================
 // Tool Definitions
@@ -403,11 +443,18 @@ export async function handleMCPTool(
   params: Record<string, unknown>
 ): Promise<ToolResult> {
   try {
+    // Security: Validate tool name
+    if (typeof toolName !== 'string' || toolName.length > 100) {
+      return { success: false, error: 'Invalid tool name' };
+    }
+
     switch (toolName) {
       // Team Management
       case 'teammate_spawn_team': {
+        // Security: Validate required parameters
+        const name = validateStringParam(params.name, 'name', 64);
         const config: Partial<TeamConfig> & { name: string } = {
-          name: params.name as string,
+          name,
           topology: (params.topology as TeamConfig['topology']) ?? 'hierarchical',
           maxTeammates: (params.maxTeammates as number) ?? 8,
           planModeRequired: (params.planModeRequired as boolean) ?? false,
@@ -424,13 +471,22 @@ export async function handleMCPTool(
       }
 
       case 'teammate_spawn': {
+        // Security: Validate required parameters
+        const name = validateStringParam(params.name, 'name', 64);
+        const role = validateStringParam(params.role, 'role', 64);
+        const prompt = validateStringParam(params.prompt, 'prompt', MAX_PARAM_LENGTH);
+        const teamName = validateStringParam(params.teamName, 'teamName', 64);
+        const allowedTools = params.allowedTools
+          ? validateArrayParam<string>(params.allowedTools, 'allowedTools', 50)
+          : undefined;
+
         const spawnConfig: TeammateSpawnConfig = {
-          name: params.name as string,
-          role: params.role as string,
-          prompt: params.prompt as string,
-          teamName: params.teamName as string,
+          name,
+          role,
+          prompt,
+          teamName,
           model: params.model as TeammateSpawnConfig['model'],
-          allowedTools: params.allowedTools as string[],
+          allowedTools,
           mode: params.mode as TeammateSpawnConfig['mode'],
           delegateAuthority: params.delegateAuthority as boolean,
           runInBackground: true,

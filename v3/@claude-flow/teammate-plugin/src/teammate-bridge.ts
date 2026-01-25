@@ -74,6 +74,22 @@ export class TeammateError extends Error {
 }
 
 // ============================================================================
+// Security Constants
+// ============================================================================
+
+/** Maximum length for team/teammate names to prevent DoS */
+const MAX_NAME_LENGTH = 64;
+
+/** Maximum message payload size in bytes */
+const MAX_PAYLOAD_SIZE = 1024 * 1024; // 1MB
+
+/** Allowed characters in team/teammate names (alphanumeric, dash, underscore) */
+const SAFE_NAME_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/;
+
+/** Reserved names that cannot be used for teams */
+const RESERVED_NAMES = new Set(['..', '.', 'config', 'state', 'mailbox', 'memory', 'remote']);
+
+// ============================================================================
 // Utility Functions
 // ============================================================================
 
@@ -98,8 +114,102 @@ function compareVersions(a: string, b: string): number {
 
 function ensureDirectory(dirPath: string): void {
   if (!fs.existsSync(dirPath)) {
-    fs.mkdirSync(dirPath, { recursive: true });
+    fs.mkdirSync(dirPath, { recursive: true, mode: 0o700 }); // Secure permissions
   }
+}
+
+// ============================================================================
+// Security Functions
+// ============================================================================
+
+/**
+ * Validate and sanitize team/teammate names to prevent path traversal
+ */
+function validateName(name: string, type: 'team' | 'teammate'): string {
+  if (!name || typeof name !== 'string') {
+    throw new TeammateError(
+      `Invalid ${type} name: must be a non-empty string`,
+      TeammateErrorCode.PERMISSION_DENIED
+    );
+  }
+
+  const trimmed = name.trim();
+
+  if (trimmed.length === 0) {
+    throw new TeammateError(
+      `Invalid ${type} name: cannot be empty`,
+      TeammateErrorCode.PERMISSION_DENIED
+    );
+  }
+
+  if (trimmed.length > MAX_NAME_LENGTH) {
+    throw new TeammateError(
+      `Invalid ${type} name: exceeds maximum length of ${MAX_NAME_LENGTH}`,
+      TeammateErrorCode.PERMISSION_DENIED
+    );
+  }
+
+  if (!SAFE_NAME_PATTERN.test(trimmed)) {
+    throw new TeammateError(
+      `Invalid ${type} name: must contain only alphanumeric characters, dashes, and underscores`,
+      TeammateErrorCode.PERMISSION_DENIED
+    );
+  }
+
+  if (RESERVED_NAMES.has(trimmed.toLowerCase())) {
+    throw new TeammateError(
+      `Invalid ${type} name: '${trimmed}' is reserved`,
+      TeammateErrorCode.PERMISSION_DENIED
+    );
+  }
+
+  return trimmed;
+}
+
+/**
+ * Validate that a path is within the allowed base directory
+ */
+function validatePath(targetPath: string, basePath: string): string {
+  const resolvedTarget = path.resolve(targetPath);
+  const resolvedBase = path.resolve(basePath);
+
+  if (!resolvedTarget.startsWith(resolvedBase + path.sep) && resolvedTarget !== resolvedBase) {
+    throw new TeammateError(
+      'Path traversal attempt detected',
+      TeammateErrorCode.PERMISSION_DENIED
+    );
+  }
+
+  return resolvedTarget;
+}
+
+/**
+ * Safely parse JSON with size limits
+ */
+function safeJSONParse<T>(content: string, maxSize: number = MAX_PAYLOAD_SIZE): T {
+  if (content.length > maxSize) {
+    throw new TeammateError(
+      `JSON content exceeds maximum size of ${maxSize} bytes`,
+      TeammateErrorCode.MAILBOX_FULL
+    );
+  }
+
+  try {
+    return JSON.parse(content) as T;
+  } catch (error) {
+    throw new TeammateError(
+      'Invalid JSON content',
+      TeammateErrorCode.PERMISSION_DENIED
+    );
+  }
+}
+
+/**
+ * Sanitize environment variable value
+ */
+function sanitizeEnvValue(value: string): string {
+  // Remove any null bytes or control characters except newlines
+  return value.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
 }
 
 // ============================================================================
@@ -115,6 +225,14 @@ export class TeammateBridge extends EventEmitter {
   private mailboxPollers: Map<string, NodeJS.Timeout> = new Map();
   private memoryPersistTimers: Map<string, NodeJS.Timeout> = new Map();
   private teammateMemories: Map<string, TeammateMemory> = new Map();
+
+  // Performance: Debounced write queues
+  private pendingWrites: Map<string, { data: unknown; timer: NodeJS.Timeout }> = new Map();
+  private readonly writeDebounceMs = 500;
+
+  // Performance: Cache for frequently accessed data
+  private teamConfigCache: Map<string, { config: TeamConfig; timestamp: number }> = new Map();
+  private readonly cacheMaxAgeMs = 30000; // 30 seconds
 
   private readonly config: PluginConfig;
   private readonly teamsDir: string;
@@ -220,6 +338,9 @@ export class TeammateBridge extends EventEmitter {
   async spawnTeam(config: Partial<TeamConfig> & { name: string }): Promise<TeamState> {
     this.ensureAvailable();
 
+    // Security: Validate team name
+    const validatedName = validateName(config.name, 'team');
+
     const fullConfig: TeamConfig = {
       topology: 'hierarchical',
       maxTeammates: 8,
@@ -230,6 +351,7 @@ export class TeammateBridge extends EventEmitter {
       delegationEnabled: true,
       remoteSync: this.config.remoteSync,
       ...config,
+      name: validatedName, // Use validated name
     };
 
     const teamState: TeamState = {
@@ -252,8 +374,8 @@ export class TeammateBridge extends EventEmitter {
       delegations: [],
     };
 
-    // Set environment for team context
-    process.env.CLAUDE_CODE_TEAM_NAME = fullConfig.name;
+    // Set environment for team context (sanitized)
+    process.env.CLAUDE_CODE_TEAM_NAME = sanitizeEnvValue(fullConfig.name);
 
     if (fullConfig.planModeRequired) {
       process.env.CLAUDE_CODE_PLAN_MODE_REQUIRED = 'true';
@@ -265,11 +387,11 @@ export class TeammateBridge extends EventEmitter {
     ensureDirectory(path.join(teamDir, 'mailbox'));
     ensureDirectory(path.join(teamDir, 'memory'));
 
-    // Save team config
+    // Save team config with secure permissions
     fs.writeFileSync(
       path.join(teamDir, 'config.json'),
       JSON.stringify(fullConfig, null, 2),
-      'utf-8'
+      { encoding: 'utf-8', mode: 0o600 }
     );
 
     this.activeTeams.set(fullConfig.name, teamState);
@@ -314,25 +436,35 @@ export class TeammateBridge extends EventEmitter {
   async loadTeam(teamName: string): Promise<TeamState> {
     this.ensureAvailable();
 
-    const teamDir = path.join(this.teamsDir, teamName);
+    // Security: Validate team name to prevent path traversal
+    const validatedName = validateName(teamName, 'team');
+
+    const teamDir = path.join(this.teamsDir, validatedName);
+    // Security: Ensure path is within teams directory
+    validatePath(teamDir, this.teamsDir);
+
     const configPath = path.join(teamDir, 'config.json');
 
     if (!fs.existsSync(configPath)) {
       throw new TeammateError(
-        `Team not found: ${teamName}`,
+        `Team not found: ${validatedName}`,
         TeammateErrorCode.TEAM_NOT_FOUND,
-        teamName
+        validatedName
       );
     }
 
-    const config = JSON.parse(fs.readFileSync(configPath, 'utf-8')) as TeamConfig;
+    // Security: Use safe JSON parsing
+    const configContent = fs.readFileSync(configPath, 'utf-8');
+    const config = safeJSONParse<TeamConfig>(configContent);
 
     // Load state file if exists
     const statePath = path.join(teamDir, 'state.json');
     let teamState: TeamState;
 
     if (fs.existsSync(statePath)) {
-      const savedState = JSON.parse(fs.readFileSync(statePath, 'utf-8'));
+      // Security: Use safe JSON parsing
+      const stateContent = fs.readFileSync(statePath, 'utf-8');
+      const savedState = safeJSONParse<any>(stateContent);
       teamState = {
         ...savedState,
         createdAt: new Date(savedState.createdAt),
@@ -470,6 +602,9 @@ export class TeammateBridge extends EventEmitter {
   async spawnTeammate(config: TeammateSpawnConfig): Promise<TeammateInfo> {
     this.ensureAvailable();
 
+    // Security: Validate teammate name
+    const validatedName = validateName(config.name, 'teammate');
+
     const teamName = config.teamName ?? process.env.CLAUDE_CODE_TEAM_NAME;
 
     if (teamName) {
@@ -494,7 +629,7 @@ export class TeammateBridge extends EventEmitter {
 
     const teammateInfo: TeammateInfo = {
       id: teammateId,
-      name: config.name,
+      name: validatedName, // Use validated name
       role: config.role,
       status: 'active',
       spawnedAt: new Date(),
@@ -628,7 +763,11 @@ export class TeammateBridge extends EventEmitter {
   async readMailbox(teamName: string, teammateId: string): Promise<MailboxMessage[]> {
     this.ensureAvailable();
 
-    const mailboxPath = this.getMailboxPath(teamName, teammateId);
+    // Security: Validate names to prevent path traversal
+    const validatedTeam = validateName(teamName, 'team');
+    const validatedTeammate = validateName(teammateId, 'teammate');
+
+    const mailboxPath = this.getMailboxPath(validatedTeam, validatedTeammate);
 
     try {
       if (!fs.existsSync(mailboxPath)) {
@@ -636,7 +775,8 @@ export class TeammateBridge extends EventEmitter {
       }
 
       const content = fs.readFileSync(mailboxPath, 'utf-8');
-      const messages: MailboxMessage[] = JSON.parse(content);
+      // Security: Use safe JSON parsing
+      const messages = safeJSONParse<MailboxMessage[]>(content);
 
       // Clear mailbox after reading
       fs.writeFileSync(mailboxPath, '[]', 'utf-8');
@@ -1088,12 +1228,14 @@ export class TeammateBridge extends EventEmitter {
     team.remoteSessionId = remoteSession.remoteSessionId;
     team.remoteSessionUrl = remoteSession.remoteSessionUrl;
 
-    // Save remote session info
-    const teamDir = path.join(this.teamsDir, teamName);
+    // Save remote session info with secure permissions
+    // Security: Validate team name
+    const validatedName = validateName(teamName, 'team');
+    const teamDir = path.join(this.teamsDir, validatedName);
     fs.writeFileSync(
       path.join(teamDir, 'remote.json'),
       JSON.stringify(remoteSession, null, 2),
-      'utf-8'
+      { encoding: 'utf-8', mode: 0o600 }
     );
 
     this.emit('remote:pushed', { team: teamName, remoteUrl: remoteSession.remoteSessionUrl });
@@ -1182,13 +1324,16 @@ export class TeammateBridge extends EventEmitter {
 
     this.teammateMemories.set(memoryKey, memory);
 
-    // Persist to disk
-    const memoryDir = path.join(this.teamsDir, teamName, 'memory');
+    // Persist to disk with secure permissions
+    // Security: Validate names for path safety
+    const validatedTeam = validateName(teamName, 'team');
+    const validatedTeammate = validateName(teammateId, 'teammate');
+    const memoryDir = path.join(this.teamsDir, validatedTeam, 'memory');
     ensureDirectory(memoryDir);
     fs.writeFileSync(
-      path.join(memoryDir, `${teammateId}.json`),
+      path.join(memoryDir, `${validatedTeammate}.json`),
       JSON.stringify(memory, null, 2),
-      'utf-8'
+      { encoding: 'utf-8', mode: 0o600 }
     );
 
     this.emit('memory:saved', { team: teamName, teammateId, size: memory.size });
@@ -1448,12 +1593,18 @@ export class TeammateBridge extends EventEmitter {
       this.memoryPersistTimers.delete(teamName);
     }
 
+    // Performance: Flush any pending writes for this team
+    this.flushPendingWrites();
+
     // Save final state
     try {
       await this.saveTeamState(teamName);
     } catch {
       // Ignore save errors during cleanup
     }
+
+    // Performance: Invalidate cache
+    this.invalidateConfigCache(teamName);
 
     // Remove from active teams
     this.activeTeams.delete(teamName);
@@ -1578,6 +1729,7 @@ export class TeammateBridge extends EventEmitter {
     teammateId: string,
     message: MailboxMessage
   ): Promise<void> {
+    // Security: Path validation already done by getMailboxPath via validateName
     const mailboxPath = this.getMailboxPath(teamName, teammateId);
     ensureDirectory(path.dirname(mailboxPath));
 
@@ -1585,7 +1737,9 @@ export class TeammateBridge extends EventEmitter {
 
     if (fs.existsSync(mailboxPath)) {
       try {
-        messages = JSON.parse(fs.readFileSync(mailboxPath, 'utf-8'));
+        const content = fs.readFileSync(mailboxPath, 'utf-8');
+        // Security: Use safe JSON parsing
+        messages = safeJSONParse<MailboxMessage[]>(content);
       } catch {
         messages = [];
       }
@@ -1599,7 +1753,11 @@ export class TeammateBridge extends EventEmitter {
 
     messages.push(message);
 
-    fs.writeFileSync(mailboxPath, JSON.stringify(messages, null, 2), 'utf-8');
+    // Security: Write with restricted permissions (owner read/write only)
+    fs.writeFileSync(mailboxPath, JSON.stringify(messages, null, 2), {
+      encoding: 'utf-8',
+      mode: 0o600,
+    });
   }
 
   private startMailboxPoller(teamName: string): void {
@@ -1675,14 +1833,96 @@ export class TeammateBridge extends EventEmitter {
     const team = this.activeTeams.get(teamName);
     if (!team) return;
 
-    const teamDir = path.join(this.teamsDir, teamName);
+    // Security: Validate team name
+    const validatedName = validateName(teamName, 'team');
+    const teamDir = path.join(this.teamsDir, validatedName);
     ensureDirectory(teamDir);
 
+    // Security: Write with restricted permissions
     fs.writeFileSync(
       path.join(teamDir, 'state.json'),
       JSON.stringify(team, null, 2),
-      'utf-8'
+      { encoding: 'utf-8', mode: 0o600 }
     );
+  }
+
+  /**
+   * Performance: Debounced file write to reduce I/O
+   */
+  private debouncedWrite(filePath: string, data: unknown): void {
+    const existing = this.pendingWrites.get(filePath);
+    if (existing) {
+      clearTimeout(existing.timer);
+    }
+
+    const timer = setTimeout(() => {
+      try {
+        fs.writeFileSync(filePath, JSON.stringify(data, null, 2), {
+          encoding: 'utf-8',
+          mode: 0o600,
+        });
+        this.pendingWrites.delete(filePath);
+      } catch (error) {
+        // Log error but don't throw - debounced writes are best-effort
+        this.emit('error', error);
+      }
+    }, this.writeDebounceMs);
+
+    this.pendingWrites.set(filePath, { data, timer });
+  }
+
+  /**
+   * Performance: Flush all pending writes immediately
+   */
+  private flushPendingWrites(): void {
+    for (const [filePath, { data, timer }] of this.pendingWrites) {
+      clearTimeout(timer);
+      try {
+        fs.writeFileSync(filePath, JSON.stringify(data, null, 2), {
+          encoding: 'utf-8',
+          mode: 0o600,
+        });
+      } catch {
+        // Ignore errors during flush
+      }
+    }
+    this.pendingWrites.clear();
+  }
+
+  /**
+   * Performance: Get cached team config or load from disk
+   */
+  private getCachedTeamConfig(teamName: string): TeamConfig | null {
+    const cached = this.teamConfigCache.get(teamName);
+    const now = Date.now();
+
+    if (cached && now - cached.timestamp < this.cacheMaxAgeMs) {
+      return cached.config;
+    }
+
+    // Cache miss or expired - load from disk
+    const validatedName = validateName(teamName, 'team');
+    const configPath = path.join(this.teamsDir, validatedName, 'config.json');
+
+    if (!fs.existsSync(configPath)) {
+      return null;
+    }
+
+    try {
+      const content = fs.readFileSync(configPath, 'utf-8');
+      const config = safeJSONParse<TeamConfig>(content);
+      this.teamConfigCache.set(teamName, { config, timestamp: now });
+      return config;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Performance: Invalidate team config cache
+   */
+  private invalidateConfigCache(teamName: string): void {
+    this.teamConfigCache.delete(teamName);
   }
 
   private getDelegationChain(team: TeamState, teammateId: string): DelegationRecord[] {

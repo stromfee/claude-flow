@@ -14,6 +14,16 @@
 
 export const MINIMUM_CLAUDE_CODE_VERSION = '2.1.19';
 
+// Security limits
+export const SECURITY_LIMITS = {
+  MAX_NAME_LENGTH: 64,
+  MAX_PAYLOAD_SIZE: 1024 * 1024, // 1MB
+  MAX_TEAMMATES_PER_TEAM: 50,
+  MAX_MESSAGES_PER_MAILBOX: 1000,
+  MAX_PLANS_PER_TEAM: 100,
+  MAX_DELEGATION_DEPTH: 5,
+} as const;
+
 export interface VersionInfo {
   claudeCode: string | null;
   plugin: string;

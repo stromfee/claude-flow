@@ -56,8 +56,9 @@ export {
 
 // Type exports
 export {
-  // Version
+  // Version & Security
   MINIMUM_CLAUDE_CODE_VERSION,
+  SECURITY_LIMITS,
   DEFAULT_PLUGIN_CONFIG,
 
   // Enums
