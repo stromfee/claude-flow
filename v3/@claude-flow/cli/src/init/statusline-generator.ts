@@ -522,11 +522,16 @@ function getSystemMetrics() {
     }
   }
 
-  // Fallback to process detection on Unix only
-  if (subAgents === 0 && !isWindows) {
+  // Fallback to process detection (cross-platform)
+  if (subAgents === 0) {
     try {
-      const agents = execSync('ps aux 2>/dev/null | grep -c "claude-flow.*agent" || echo "0"', { encoding: 'utf-8' });
-      subAgents = Math.max(0, parseInt(agents.trim()) - 1);
+      if (isWin32) {
+        const ps = execSync('tasklist /FI "IMAGENAME eq node.exe" /NH 2>NUL', { encoding: 'utf-8' });
+        subAgents = Math.max(0, (ps.match(/node\\.exe/gi) || []).length - 1);
+      } else {
+        const agents = execSync('ps aux 2>/dev/null | grep -c "claude-flow.*agent" || echo "0"', { encoding: 'utf-8' });
+        subAgents = Math.max(0, parseInt(agents.trim()) - 1);
+      }
     } catch (e) {
       // Ignore
     }
