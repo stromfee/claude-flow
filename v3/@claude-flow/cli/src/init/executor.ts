@@ -524,6 +524,30 @@ async function writeSettings(
   const content = generateSettingsJson(options);
   fs.writeFileSync(settingsPath, content, 'utf-8');
   result.created.files.push('.claude/settings.json');
+
+  // When --force is used, also regenerate settings.json at the OTHER location
+  // (HOME vs project) to prevent Claude Code from merging stale hooks.
+  // Claude Code reads and merges settings from both ~/.claude/settings.json
+  // and <project>/.claude/settings.json -- stale hooks at either location
+  // cause duplicate/broken hook execution.
+  if (options.force) {
+    const homeDir = process.env.HOME || process.env.USERPROFILE || '';
+    if (homeDir) {
+      const homeSettingsPath = path.join(homeDir, '.claude', 'settings.json');
+      const targetResolved = path.resolve(targetDir);
+      const homeResolved = path.resolve(homeDir);
+
+      // Only write to HOME if targetDir is NOT already the home directory
+      if (targetResolved !== homeResolved && fs.existsSync(homeSettingsPath)) {
+        try {
+          fs.writeFileSync(homeSettingsPath, content, 'utf-8');
+          result.created.files.push('~/.claude/settings.json');
+        } catch {
+          // Non-fatal: HOME dir may be read-only or permissions differ
+        }
+      }
+    }
+  }
 }
 
 /**
