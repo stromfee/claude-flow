@@ -47,6 +47,10 @@ const CONFIG = {
   topology: '${options.runtime.topology}',
 };
 
+// Cross-platform helpers
+const isWin32 = process.platform === 'win32';
+const nullDev = isWin32 ? 'NUL' : '/dev/null';
+
 // ANSI colors
 const c = {
   reset: '\\x1b[0m',
