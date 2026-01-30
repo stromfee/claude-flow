@@ -1,30 +1,14 @@
 /**
  * Settings.json Generator
  * Creates .claude/settings.json with V3-optimized hook configurations
+ *
+ * CROSS-PLATFORM: All generated commands work on bash, cmd.exe, and PowerShell.
+ * - Claude Code substitutes $VAR before passing to the shell
+ * - No shell-specific syntax (no [ ], || true, 2>/dev/null, $(...))
+ * - continueOnError: true handles all failure cases
  */
 
 import type { InitOptions, HooksConfig } from './types.js';
-
-// Cross-platform command helpers for generated settings.json
-const IS_WINDOWS = process.platform === 'win32';
-const NULL_DEV = IS_WINDOWS ? 'NUL' : '/dev/null';
-
-/**
- * Generate a cross-platform hook command
- * On Unix: [ -n "$VAR" ] && npx ... 2>/dev/null || true
- * On Windows: npx ... 2>NUL (relies on continueOnError: true)
- */
-function hookCmd(cmd: string, guardVar?: string): string {
-  if (IS_WINDOWS) {
-    // Windows cmd.exe: no [ -n ] test, no || true (continueOnError handles it)
-    return `${cmd} 2>${NULL_DEV}`;
-  }
-  // Unix bash: guard with variable check if provided
-  if (guardVar) {
-    return `[ -n "${guardVar}" ] && ${cmd} 2>/dev/null || true`;
-  }
-  return `${cmd} 2>/dev/null || true`;
-}
 
 /**
  * Generate the complete settings.json content
@@ -144,10 +128,10 @@ export function generateSettings(options: InitOptions): object {
 function generateStatusLineConfig(options: InitOptions): object {
   const config = options.statusline;
 
-  // Build the command that generates the statusline (cross-platform)
-  // Uses npx @claude-flow/cli@latest (or @alpha) to run the hooks statusline command
-  // Falls back to local helper script or simple "V3" if CLI not available
-  const statuslineCommand = `npx @claude-flow/cli@latest hooks statusline 2>${NULL_DEV} || node .claude/helpers/statusline.cjs 2>${NULL_DEV} || echo "▊ Claude Flow V3"`;
+  // Cross-platform statusline command
+  // npx works on all platforms; node fallback is also cross-platform
+  // || works on bash, cmd.exe, and PowerShell
+  const statuslineCommand = 'npx @claude-flow/cli@latest hooks statusline || node .claude/helpers/statusline.cjs || echo Claude Flow V3';
 
   return {
     // Type must be "command" for Claude Code validation
@@ -163,22 +147,17 @@ function generateStatusLineConfig(options: InitOptions): object {
 
 /**
  * Generate hooks configuration
+ *
+ * All commands are cross-platform (bash, cmd.exe, PowerShell):
+ * - Claude Code substitutes $VAR before passing to the shell
+ * - No shell-specific syntax: no [ ], || true, 2>/dev/null, $(...)
+ * - continueOnError: true handles all failure cases
  */
 function generateHooksConfig(config: HooksConfig): object {
   const hooks: Record<string, unknown[]> = {};
 
-  // PreToolUse hooks - cross-platform via npx with defensive guards
+  // PreToolUse hooks
   if (config.preToolUse) {
-    const preEditCmd = IS_WINDOWS
-      ? `npx @claude-flow/cli@latest hooks pre-edit --file "%TOOL_INPUT_file_path%" 2>${NULL_DEV}`
-      : '[ -n "$TOOL_INPUT_file_path" ] && npx @claude-flow/cli@latest hooks pre-edit --file "$TOOL_INPUT_file_path" 2>/dev/null || true';
-    const preCommandCmd = IS_WINDOWS
-      ? `npx @claude-flow/cli@latest hooks pre-command --command "%TOOL_INPUT_command%" 2>${NULL_DEV}`
-      : '[ -n "$TOOL_INPUT_command" ] && npx @claude-flow/cli@latest hooks pre-command --command "$TOOL_INPUT_command" 2>/dev/null || true';
-    const preTaskCmd = IS_WINDOWS
-      ? `npx @claude-flow/cli@latest hooks pre-task --description "%TOOL_INPUT_prompt%" 2>${NULL_DEV}`
-      : '[ -n "$TOOL_INPUT_prompt" ] && npx @claude-flow/cli@latest hooks pre-task --task-id "task-$(date +%s)" --description "$TOOL_INPUT_prompt" 2>/dev/null || true';
-
     hooks.PreToolUse = [
       // File edit hooks with intelligence routing
       {
@@ -186,7 +165,7 @@ function generateHooksConfig(config: HooksConfig): object {
         hooks: [
           {
             type: 'command',
-            command: preEditCmd,
+            command: 'npx @claude-flow/cli@latest hooks pre-edit --file "$TOOL_INPUT_file_path"',
             timeout: config.timeout,
             continueOnError: true,
           },
@@ -198,7 +177,7 @@ function generateHooksConfig(config: HooksConfig): object {
         hooks: [
           {
             type: 'command',
-            command: preCommandCmd,
+            command: 'npx @claude-flow/cli@latest hooks pre-command --command "$TOOL_INPUT_command"',
             timeout: config.timeout,
             continueOnError: true,
           },
@@ -210,7 +189,7 @@ function generateHooksConfig(config: HooksConfig): object {
         hooks: [
           {
             type: 'command',
-            command: preTaskCmd,
+            command: 'npx @claude-flow/cli@latest hooks pre-task --description "$TOOL_INPUT_prompt"',
             timeout: config.timeout,
             continueOnError: true,
           },
@@ -219,18 +198,8 @@ function generateHooksConfig(config: HooksConfig): object {
     ];
   }
 
-  // PostToolUse hooks - cross-platform via npx with defensive guards
+  // PostToolUse hooks
   if (config.postToolUse) {
-    const postEditCmd = IS_WINDOWS
-      ? `npx @claude-flow/cli@latest hooks post-edit --file "%TOOL_INPUT_file_path%" --success "%TOOL_SUCCESS%" 2>${NULL_DEV}`
-      : '[ -n "$TOOL_INPUT_file_path" ] && npx @claude-flow/cli@latest hooks post-edit --file "$TOOL_INPUT_file_path" --success "${TOOL_SUCCESS:-true}" 2>/dev/null || true';
-    const postCommandCmd = IS_WINDOWS
-      ? `npx @claude-flow/cli@latest hooks post-command --command "%TOOL_INPUT_command%" --success "%TOOL_SUCCESS%" 2>${NULL_DEV}`
-      : '[ -n "$TOOL_INPUT_command" ] && npx @claude-flow/cli@latest hooks post-command --command "$TOOL_INPUT_command" --success "${TOOL_SUCCESS:-true}" 2>/dev/null || true';
-    const postTaskCmd = IS_WINDOWS
-      ? `npx @claude-flow/cli@latest hooks post-task --task-id "%TOOL_RESULT_agent_id%" --success "%TOOL_SUCCESS%" 2>${NULL_DEV}`
-      : '[ -n "$TOOL_RESULT_agent_id" ] && npx @claude-flow/cli@latest hooks post-task --task-id "$TOOL_RESULT_agent_id" --success "${TOOL_SUCCESS:-true}" 2>/dev/null || true';
-
     hooks.PostToolUse = [
       // File edit hooks with neural pattern training
       {
@@ -238,7 +207,7 @@ function generateHooksConfig(config: HooksConfig): object {
         hooks: [
           {
             type: 'command',
-            command: postEditCmd,
+            command: 'npx @claude-flow/cli@latest hooks post-edit --file "$TOOL_INPUT_file_path" --success "$TOOL_SUCCESS"',
             timeout: config.timeout,
             continueOnError: true,
           },
@@ -250,7 +219,7 @@ function generateHooksConfig(config: HooksConfig): object {
         hooks: [
           {
             type: 'command',
-            command: postCommandCmd,
+            command: 'npx @claude-flow/cli@latest hooks post-command --command "$TOOL_INPUT_command" --success "$TOOL_SUCCESS"',
             timeout: config.timeout,
             continueOnError: true,
           },
@@ -262,7 +231,7 @@ function generateHooksConfig(config: HooksConfig): object {
         hooks: [
           {
             type: 'command',
-            command: postTaskCmd,
+            command: 'npx @claude-flow/cli@latest hooks post-task --task-id "$TOOL_RESULT_agent_id" --success "$TOOL_SUCCESS"',
             timeout: config.timeout,
             continueOnError: true,
           },
@@ -273,16 +242,12 @@ function generateHooksConfig(config: HooksConfig): object {
 
   // UserPromptSubmit for intelligent routing
   if (config.userPromptSubmit) {
-    const routeCmd = IS_WINDOWS
-      ? `npx @claude-flow/cli@latest hooks route --task "%PROMPT%" 2>${NULL_DEV}`
-      : '[ -n "$PROMPT" ] && npx @claude-flow/cli@latest hooks route --task "$PROMPT" || true';
-
     hooks.UserPromptSubmit = [
       {
         hooks: [
           {
             type: 'command',
-            command: routeCmd,
+            command: 'npx @claude-flow/cli@latest hooks route --task "$PROMPT"',
             timeout: config.timeout,
             continueOnError: true,
           },
@@ -293,25 +258,18 @@ function generateHooksConfig(config: HooksConfig): object {
 
   // SessionStart for context loading and daemon auto-start
   if (config.sessionStart) {
-    const daemonCmd = IS_WINDOWS
-      ? `npx @claude-flow/cli@latest daemon start --quiet 2>${NULL_DEV}`
-      : 'npx @claude-flow/cli@latest daemon start --quiet 2>/dev/null || true';
-    const sessionRestoreCmd = IS_WINDOWS
-      ? `npx @claude-flow/cli@latest hooks session-restore --session-id "%SESSION_ID%" 2>${NULL_DEV}`
-      : '[ -n "$SESSION_ID" ] && npx @claude-flow/cli@latest hooks session-restore --session-id "$SESSION_ID" 2>/dev/null || true';
-
     hooks.SessionStart = [
       {
         hooks: [
           {
             type: 'command',
-            command: daemonCmd,
+            command: 'npx @claude-flow/cli@latest daemon start --quiet',
             timeout: 5000,
             continueOnError: true,
           },
           {
             type: 'command',
-            command: sessionRestoreCmd,
+            command: 'npx @claude-flow/cli@latest hooks session-restore --session-id "$SESSION_ID"',
             timeout: 10000,
             continueOnError: true,
           },
@@ -321,14 +279,14 @@ function generateHooksConfig(config: HooksConfig): object {
   }
 
   // Stop hooks for task evaluation - always return ok by default
-  // The hook outputs JSON that Claude Code validates
+  // Use node for cross-platform JSON output (echo quoting differs between shells)
   if (config.stop) {
     hooks.Stop = [
       {
         hooks: [
           {
             type: 'command',
-            command: 'echo \'{"ok": true}\'',
+            command: 'node -e "process.stdout.write(JSON.stringify({ok:true}))"',
             timeout: 1000,
           },
         ],
@@ -338,16 +296,12 @@ function generateHooksConfig(config: HooksConfig): object {
 
   // Notification hooks - store notifications in memory for swarm awareness
   if (config.notification) {
-    const notifyCmd = IS_WINDOWS
-      ? `npx @claude-flow/cli@latest memory store --namespace notifications --key "notify-%RANDOM%" --value "%NOTIFICATION_MESSAGE%" 2>${NULL_DEV}`
-      : '[ -n "$NOTIFICATION_MESSAGE" ] && npx @claude-flow/cli@latest memory store --namespace notifications --key "notify-$(date +%s)" --value "$NOTIFICATION_MESSAGE" 2>/dev/null || true';
-
     hooks.Notification = [
       {
         hooks: [
           {
             type: 'command',
-            command: notifyCmd,
+            command: 'npx @claude-flow/cli@latest memory store --namespace notifications --key "notify" --value "$NOTIFICATION_MESSAGE"',
             timeout: 3000,
             continueOnError: true,
           },
